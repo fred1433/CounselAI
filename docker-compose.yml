@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: counselai-backend
+    ports:
+      - "3001:3001"
+    networks:
+      - counselai-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: counselai-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - counselai-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  counselai-net:
+    driver: bridge 

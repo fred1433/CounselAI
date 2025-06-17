@@ -1,0 +1,401 @@
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { contractSchema, ContractFormData } from '@/lib/validation/contract-schema';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import axios from 'axios';
+import { useState } from 'react';
+
+const benefitOptions = [
+    { id: 'health', label: 'Health' },
+    { id: 'dental', label: 'Dental' },
+    { id: 'vacationSick', label: 'Vacation/sick' },
+    { id: 'parking', label: 'Parking' },
+    { id: 'profitSharing', label: 'Profit Sharing' },
+    { id: 'fourZeroOneK', label: '401K' },
+    { id: 'paidBarMembership', label: 'Paid Bar membership' },
+    { id: 'clePaid', label: 'CLE paid' },
+    { id: 'cellPhone', label: 'Cell phone' },
+] as const;
+
+
+export default function Home() {
+  const [generatedContract, setGeneratedContract] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const form = useForm<ContractFormData>({
+    resolver: zodResolver(contractSchema),
+    defaultValues: {
+      employerName: "",
+      employeeName: "",
+      jobTitle: "",
+      jobDescription: "",
+      startDate: "",
+      hasInitialTerm: false,
+      hasNoEndDate: true,
+      onSitePresence: "",
+      salary: "",
+      benefits: {
+        health: false,
+        dental: false,
+        vacationSick: false,
+        parking: false,
+        profitSharing: false,
+        fourZeroOneK: false,
+        paidBarMembership: false,
+        clePaid: false,
+        cellPhone: false,
+      },
+      otherBenefits: "",
+      includeNda: false,
+      includeNonCompetition: false,
+      attyInNotice: false,
+      prose: "",
+    },
+  });
+
+  async function onSubmit(data: ContractFormData) {
+    setIsLoading(true);
+    setGeneratedContract('');
+    try {
+      const response = await axios.post('http://localhost:3001/api/v1/contracts/generate', data);
+      console.log('Backend response:', response.data);
+      setGeneratedContract(response.data.contract);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      // TODO: Display a user-friendly error message
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 sm:p-8">
+      <div className="w-full max-w-4xl space-y-8">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Assistant de Création : Contrat de Travail</CardTitle>
+            <CardDescription>
+              Remplissez les champs ci-dessous pour générer un premier brouillon de contrat.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {/* Section: Parties */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Parties</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="employerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nom de l&apos;employeur</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: Acme Inc." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="employeeName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nom de l&apos;employé(e)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Section: Poste */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Poste</h3>
+                  <FormField
+                    control={form.control}
+                    name="jobTitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Titre du poste</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: Ingénieur Logiciel Senior" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="jobDescription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description du poste</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Décrire les principales responsabilités, les tâches quotidiennes, et les objectifs du poste..."
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Section: Termes */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Termes du contrat</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date de début</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <FormLabel>Durée</FormLabel>
+                      <div className="flex items-center space-x-2">
+                        <FormField
+                          control={form.control}
+                          name="hasInitialTerm"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="hasNoEndDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: Conditions */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Conditions</h3>
+                  <FormField
+                    control={form.control}
+                    name="onSitePresence"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Présence sur site</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: 50%" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="salary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Salaire</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: $50,000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Section: Avantages */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Avantages</h3>
+                  <FormField
+                    control={form.control}
+                    name="benefits"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Avantages</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            {benefitOptions.map((option) => (
+                              <FormField
+                                key={option.id}
+                                control={field.control}
+                                name={`benefits.${option.id}`}
+                                render={({ field: optionField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={optionField.value}
+                                        onCheckedChange={optionField.onChange}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            ))}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="otherBenefits"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Autres avantages</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Section: Conditions */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Conditions</h3>
+                  <FormField
+                    control={form.control}
+                    name="includeNda"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>NDA</FormLabel>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="includeNonCompetition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Non-compétitivité</FormLabel>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="attyInNotice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Avocat dans la notification</FormLabel>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Section: Prose */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Prose</h3>
+                  <FormField
+                    control={form.control}
+                    name="prose"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prose</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Génération en cours...' : 'Générer le Brouillon'}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        {generatedContract && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Brouillon du Contrat</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="whitespace-pre-wrap font-sans text-sm">
+                {generatedContract}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </main>
+  );
+}
