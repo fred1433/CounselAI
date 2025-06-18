@@ -710,7 +710,7 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-              </div>
+        </div>
 
               {/* Section: Prose */}
               <div className="space-y-4">
