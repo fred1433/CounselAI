@@ -642,7 +642,7 @@ export default function Home() {
   );
 
   const renderEditor = () => (
-    <div className="flex w-full space-x-8">
+    <div className="flex w-full space-x-8 items-start">
       {/* Left side: Document */}
       <div className="flex-1">
         <Card className="h-full">
@@ -665,8 +665,8 @@ export default function Home() {
         </Card>
       </div>
       {/* Right side: Chat */}
-      <div className="w-1/3">
-        <Card className="h-full flex flex-col">
+      <div className="w-1/3 sticky top-8">
+        <Card className="flex flex-col max-h-[calc(100vh-6rem)]">
           <CardHeader>
             <CardTitle>Ask for changes</CardTitle>
             <CardDescription>
