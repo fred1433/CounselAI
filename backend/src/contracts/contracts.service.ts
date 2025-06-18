@@ -5,17 +5,21 @@ import { GenerateContractDto } from './dto/generate-contract.dto';
 
 @Injectable()
 export class ContractsService {
-  private readonly genAI: GoogleGenerativeAI;
-  private readonly modelName: string;
+  private genAI: GoogleGenerativeAI;
+  private modelName: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not defined. Please check your .env file.');
+      throw new Error('GEMINI_API_KEY is not set in the environment variables.');
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
-    
-    this.modelName = this.configService.get<string>('GEMINI_MODEL_NAME', 'gemini-pro');
+
+    const modelName = this.configService.get<string>('GEMINI_MODEL_NAME');
+    if (!modelName) {
+      throw new Error('GEMINI_MODEL_NAME is not set in the environment variables.');
+    }
+    this.modelName = modelName;
   }
 
   async generateContract(
@@ -39,7 +43,7 @@ export class ContractsService {
   async editContract(currentContract: string, instruction: string): Promise<{ contract: string }> {
     const prompt = this.buildEditPrompt(currentContract, instruction);
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.genAI.getGenerativeModel({ model: this.modelName });
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const newContract = response.text();
