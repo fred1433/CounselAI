@@ -170,16 +170,16 @@ The Company and Employee are hereinafter collectively referred to as the "Partie
 
 11.6. **Notices:** All notices required or permitted under this Agreement shall be in writing and delivered personally, by reputable overnight courier, or by certified mail, return receipt requested, to the addresses set forth below or to such other address as either Party may specify by notice to the other.
 
-    **If to Company:**
-    Innovatech Solutions
-    [Company Address, e.g., 123 Tech Drive]
-    [City, State, Zip, e.g., Silicon Valley, CA 90210, USA]
-    Attention: Human Resources
+**If to Company:**
+Innovatech Solutions
+[Company Address, e.g., 123 Tech Drive]
+[City, State, Zip, e.g., Silicon Valley, CA 90210, USA]
+Attention: Human Resources
 
-    **If to Employee:**
-    Alice Dubois
-    [Employee Address, e.g., 45 Rue de la Paix]
-    [City, Postal Code, Country, e.g., 75002 Paris, France]
+**If to Employee:**
+Alice Dubois
+[Employee Address, e.g., 45 Rue de la Paix]
+[City, Postal Code, Country, e.g., 75002 Paris, France]
 
 11.7. **Headings:** The headings in this Agreement are for convenience only and shall not affect its interpretation.
 
