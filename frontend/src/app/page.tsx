@@ -651,23 +651,23 @@ export default function Home() {
     <div className="flex w-full space-x-8 items-start">
       {/* Left side: Document */}
       <div className="flex-1">
-        <Card className="h-full">
+        <Card className="h-full relative max-h-[calc(100vh-6rem)] flex flex-col">
           <CardHeader>
             <CardTitle>Contract Draft</CardTitle>
           </CardHeader>
-          <CardContent className="prose max-w-none relative">
-            {isEditing && (
-              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                <div className="text-center">
-                  <p className="text-lg font-semibold">Editing in progress...</p>
-                  <p className="text-sm text-gray-600">The AI is applying your changes.</p>
-                </div>
-              </div>
-            )}
+          <CardContent className="prose max-w-none flex-1 overflow-y-auto">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {generatedContract}
             </ReactMarkdown>
           </CardContent>
+          {isEditing && (
+            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+              <div className="text-center">
+                <p className="text-lg font-semibold">Editing in progress...</p>
+                <p className="text-sm text-gray-600">The AI is applying your changes.</p>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
       {/* Right side: Chat */}
