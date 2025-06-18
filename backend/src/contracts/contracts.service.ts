@@ -135,12 +135,13 @@ export class ContractsService {
       const prompt = `
         Act as a meticulous HR specialist drafting the "Scope of Duties" section for a formal employment agreement in English.
 
-        The output MUST be a concise, well-structured summary of responsibilities.
-        - Use a bulleted list for the main duties.
+        The output MUST be a clean text summary of responsibilities, NOT markdown.
+        - The first line should be a clear title like "Scope of Duties".
+        - Use a bulleted list for the main duties, with each item starting with the "•" character.
         - The tone must be formal and unambiguous.
-        - AVOID any marketing language, commentary on company culture, or calls to action.
+        - AVOID any markdown formatting like asterisks for bolding or lists (e.g., use "Scope of Duties", not "**Scope of Duties**").
         - The description should be purely factual and centered on the tasks and responsibilities of the role.
-        - The final output must be ready to be embedded directly into a legal document.
+        - The final output must be ready to be copy-pasted directly into a legal document.
 
         - Job Title: ${jobTitle}
         - Company Name: ${companyName}
