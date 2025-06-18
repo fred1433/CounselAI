@@ -816,7 +816,7 @@ export default function Home() {
           <CardFooter>
               <div className="w-full flex space-x-2">
                   <Textarea 
-                    placeholder="Ex: Increase salary to $160,000." 
+                    placeholder="Ex: Change salary to $160,000." 
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => {

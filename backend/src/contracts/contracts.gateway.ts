@@ -26,25 +26,26 @@ export class ContractsGateway {
 
   @SubscribeMessage('editRequest')
   async handleMessage(@MessageBody() data: EditPayload): Promise<void> {
-    console.log(`Received edit request: ${data.message}`);
     try {
       const { contract: newContract } = await this.contractsService.editContract(
         data.contract,
         data.message,
       );
-      this.server.emit('contractUpdated', newContract);
+
+      // Sanitize the LLM response to remove markdown code blocks
+      let sanitizedContract = newContract;
+      const markdownBlockRegex = /^```markdown\n(.*)\n```$/s;
+      const match = sanitizedContract.match(markdownBlockRegex);
+
+      if (match && match[1]) {
+        sanitizedContract = match[1];
+      }
+
+      this.server.emit('contractUpdated', sanitizedContract);
     } catch (error) {
       console.error('Error during contract editing:', error);
       // Optionally, emit an error event to the client
       this.server.emit('editError', 'Failed to update the contract.');
     }
-  }
-
-  handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
-  }
-
-  handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
   }
 } 
