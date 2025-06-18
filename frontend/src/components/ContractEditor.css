@@ -1,0 +1,31 @@
+/* Basic styling for the Tiptap editor to make it look like a document page */
+.ProseMirror {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: white;
+  min-height: 400px; /* Ensure it has some height initially */
+  outline: none; /* Remove the default focus outline */
+  border: 1px solid #e5e7eb; /* A light border to define the editable area */
+  transition: border-color 0.2s;
+}
+
+.ProseMirror:focus {
+  border-color: #3b82f6; /* Highlight with a blue border on focus */
+}
+
+/* Ensure the prose styles from Tailwind apply correctly within the editor */
+.ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  margin-bottom: 1em;
+  margin-top: 1.5em;
+} 

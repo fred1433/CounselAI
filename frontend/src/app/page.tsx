@@ -26,12 +26,11 @@ import {
 } from '@/components/ui/form';
 import axios from 'axios';
 import { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { io, Socket } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { Loader2 } from 'lucide-react';
+import ContractEditor from '@/components/ContractEditor';
 
 // For development: initialize with mock data to bypass the form.
 const MOCK_CONTRACT_DATA = `# EMPLOYMENT AGREEMENT
@@ -776,10 +775,12 @@ export default function Home() {
               Export as PDF
             </Button>
           </CardHeader>
-          <CardContent id="contract-content" className="prose max-w-none flex-1 overflow-y-auto p-6">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {generatedContract}
-            </ReactMarkdown>
+          <CardContent id="contract-content" className="flex-1 overflow-y-auto p-6">
+            <ContractEditor
+              content={generatedContract}
+              onChange={setGeneratedContract}
+              isEditing={isEditing}
+            />
           </CardContent>
           {isEditing && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
