@@ -25,9 +25,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import axios from 'axios';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { io, Socket } from 'socket.io-client';
 
 const benefitOptions = [
     { id: 'health', label: 'Health' },
@@ -45,6 +46,10 @@ const benefitOptions = [
 export default function Home() {
   const [generatedContract, setGeneratedContract] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{ author: string, message: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   const form = useForm<ContractFormData>({
     resolver: zodResolver(contractSchema),
@@ -95,6 +100,53 @@ export default function Home() {
       setIsLoading(false);
     }
   }
+
+  // Effect to manage WebSocket connection
+  useEffect(() => {
+    if (!generatedContract) return;
+
+    // Make sure to use the correct backend URL
+    const newSocket = io('http://localhost:3001'); 
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+      setChatHistory(prev => [...prev, { author: 'System', message: 'Connected to the server.' }]);
+    });
+
+    newSocket.on('contractUpdated', (newContract: string) => {
+      setGeneratedContract(newContract);
+      setIsEditing(false);
+      setChatHistory(prev => [...prev, { author: 'System', message: 'Contract has been updated.' }]);
+    });
+
+    newSocket.on('editError', (errorMessage: string) => {
+      setIsEditing(false);
+      setChatHistory(prev => [...prev, { author: 'System', message: `Error: ${errorMessage}` }]);
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from WebSocket server');
+       setChatHistory(prev => [...prev, { author: 'System', message: 'Disconnected from the server.' }]);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [generatedContract]);
+
+  const handleSendMessage = () => {
+    if (socket && chatInput.trim()) {
+      setIsEditing(true);
+      const payload = {
+        message: chatInput,
+        contract: generatedContract,
+      };
+      socket.emit('editRequest', payload);
+      setChatHistory(prev => [...prev, { author: 'You', message: chatInput }]);
+      setChatInput('');
+    }
+  };
   
   const renderForm = () => (
     <div className="w-full max-w-4xl mx-auto">
@@ -411,7 +463,15 @@ export default function Home() {
           <CardHeader>
             <CardTitle>Contract Draft</CardTitle>
           </CardHeader>
-          <CardContent className="prose max-w-none">
+          <CardContent className="prose max-w-none relative">
+            {isEditing && (
+              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <p className="text-lg font-semibold">Editing in progress...</p>
+                  <p className="text-sm text-gray-600">The AI is applying your changes.</p>
+                </div>
+              </div>
+            )}
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {generatedContract}
             </ReactMarkdown>
@@ -428,16 +488,31 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
-            <div className="h-full border rounded-md p-2 bg-gray-50">
-              <p className="text-sm text-gray-500">
-                Chat history will appear here.
-              </p>
+            <div className="h-full border rounded-md p-4 bg-gray-50 space-y-4 overflow-y-auto">
+              {chatHistory.map((chat, index) => (
+                <div key={index} className="text-sm">
+                  <span className="font-bold">{chat.author}: </span>
+                  <span>{chat.message}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
           <CardFooter>
               <div className="w-full flex space-x-2">
-                  <Textarea placeholder="Ex: Increase salary to $160,000." />
-                  <Button>Send</Button>
+                  <Textarea 
+                    placeholder="Ex: Increase salary to $160,000." 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                  />
+                  <Button onClick={handleSendMessage} disabled={isEditing}>
+                    {isEditing ? 'Editing...' : 'Send'}
+                  </Button>
               </div>
           </CardFooter>
         </Card>

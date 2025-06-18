@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GenerateContractDto } from './dto/generate-contract.dto';
@@ -34,6 +34,39 @@ export class ContractsService {
       // TODO: Gérer les erreurs de manière plus robuste
       throw new Error('Failed to generate contract from Gemini API.');
     }
+  }
+
+  async editContract(currentContract: string, instruction: string): Promise<{ contract: string }> {
+    const prompt = this.buildEditPrompt(currentContract, instruction);
+    try {
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const newContract = response.text();
+      return { contract: newContract };
+    } catch (error) {
+      console.error('Error editing contract with Gemini:', error);
+      throw new InternalServerErrorException('Failed to edit contract.');
+    }
+  }
+
+  private buildEditPrompt(contract: string, instruction: string): string {
+    return `
+      Act as an expert US-based lawyer editing a document.
+      You will be given an existing employment agreement and an instruction for a change.
+      Apply the change directly to the contract and return ONLY the full, updated Markdown text of the contract.
+      Do not add any commentary, preamble, or explanation. Return only the edited contract.
+
+      **Instruction:**
+      "${instruction}"
+
+      ---
+
+      **Existing Contract:**
+      \`\`\`markdown
+      ${contract}
+      \`\`\`
+    `;
   }
 
   private buildPrompt(data: GenerateContractDto): string {
