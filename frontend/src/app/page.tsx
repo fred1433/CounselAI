@@ -280,29 +280,35 @@ export default function Home() {
   useEffect(() => {
     if (!generatedContract) return;
 
+    // Set an initial welcome message from the assistant
+    setChatHistory([{
+      author: 'Assistant',
+      message: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
+    }]);
+
     // Make sure to use the correct backend URL
     const newSocket = io('http://localhost:3001'); 
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Connected to WebSocket server');
-      setChatHistory(prev => [...prev, { author: 'System', message: 'Connected to the server.' }]);
+      // setChatHistory(prev => [...prev, { author: 'System', message: 'Connected to the server.' }]);
     });
 
     newSocket.on('contractUpdated', (newContract: string) => {
       setGeneratedContract(newContract);
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { author: 'System', message: 'Contract has been updated.' }]);
+      setChatHistory(prev => [...prev, { author: 'Assistant', message: 'Parfait, le contrat a été mis à jour.' }]);
     });
 
     newSocket.on('editError', (errorMessage: string) => {
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { author: 'System', message: `Error: ${errorMessage}` }]);
+      setChatHistory(prev => [...prev, { author: 'Assistant', message: `Désolé, une erreur est survenue: ${errorMessage}` }]);
     });
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
-       setChatHistory(prev => [...prev, { author: 'System', message: 'Disconnected from the server.' }]);
+       //  setChatHistory(prev => [...prev, { author: 'System', message: 'Disconnected from the server.' }]);
     });
 
     return () => {
