@@ -31,6 +31,7 @@ import remarkGfm from 'remark-gfm';
 import { io, Socket } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
+import { Loader2 } from 'lucide-react';
 
 // For development: initialize with mock data to bypass the form.
 const MOCK_CONTRACT_DATA = `# EMPLOYMENT AGREEMENT
@@ -222,9 +223,10 @@ const benefitOptions = [
 
 export default function Home() {
   const [generatedContract, setGeneratedContract] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGeneratingContract, setIsGeneratingContract] = useState<boolean>(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{ author: string, message: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
 
@@ -234,7 +236,6 @@ export default function Home() {
       employerName: "Innovatech Solutions",
       employeeName: "Alice Dubois",
       jobTitle: "Senior Software Engineer",
-      companyBusiness: "",
       jobDescription: "",
       startDate: new Date().toISOString().split('T')[0],
       hasInitialTerm: false,
@@ -261,7 +262,7 @@ export default function Home() {
   });
 
   async function onSubmit(data: ContractFormData) {
-    setIsLoading(true);
+    setIsGeneratingContract(true);
     setGeneratedContract('');
     try {
       const response = await axios.post('http://localhost:3001/api/v1/contracts/generate', data);
@@ -275,7 +276,7 @@ export default function Home() {
       console.error('Error submitting form:', error);
       setGeneratedContract("Error: Failed to communicate with the server.");
     } finally {
-      setIsLoading(false);
+      setIsGeneratingContract(false);
     }
   }
 
@@ -285,8 +286,8 @@ export default function Home() {
 
     // Set an initial welcome message from the assistant
     setChatHistory([{
-      author: 'Assistant',
-      message: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
+      role: 'assistant',
+      content: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
     }]);
 
     // Make sure to use the correct backend URL
@@ -301,12 +302,12 @@ export default function Home() {
     newSocket.on('contractUpdated', (newContract: string) => {
       setGeneratedContract(newContract);
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { author: 'Assistant', message: 'Parfait, le contrat a été mis à jour.' }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Parfait, le contrat a été mis à jour.' }]);
     });
 
     newSocket.on('editError', (errorMessage: string) => {
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { author: 'Assistant', message: `Désolé, une erreur est survenue: ${errorMessage}` }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: `Désolé, une erreur est survenue: ${errorMessage}` }]);
     });
 
     newSocket.on('disconnect', () => {
@@ -327,7 +328,7 @@ export default function Home() {
         contract: generatedContract,
       };
       socket.emit('editRequest', payload);
-      setChatHistory(prev => [...prev, { author: 'You', message: chatInput }]);
+      setChatHistory(prev => [...prev, { role: 'user', content: chatInput }]);
       setChatInput('');
     }
   };
@@ -402,13 +403,13 @@ export default function Home() {
       return;
     }
 
+    setIsGeneratingDescription(true);
     try {
       const { jobTitle, employerName } = form.getValues();
       
       const response = await axios.post('http://localhost:3001/api/v1/contracts/generate-description', {
         jobTitle,
         companyName: employerName,
-        companyBusiness: form.getValues('companyBusiness'),
       });
 
       if (response.data && response.data.description) {
@@ -418,6 +419,8 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to generate description:', error);
       // Here we could show a toast notification for server errors
+    } finally {
+      setIsGeneratingDescription(false);
     }
   };
 
@@ -490,8 +493,13 @@ export default function Home() {
                       <FormItem>
                         <div className="flex items-center justify-between">
                           <FormLabel>Job Description</FormLabel>
-                          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={handleGenerateDescription}>
-                            Generate with AI
+                          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={handleGenerateDescription} disabled={isGeneratingDescription}>
+                            {isGeneratingDescription ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : 'Generate with AI'}
                           </Button>
                         </div>
                         <FormControl>
@@ -702,19 +710,6 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="companyBusiness"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Business (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Develops AI-powered legal tech" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               {/* Section: Prose */}
@@ -740,8 +735,15 @@ export default function Home() {
               </div>
 
               <div className="flex items-center justify-center space-x-4 pt-4">
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'Generating Draft...' : 'Generate Draft'}
+                <Button type="submit" disabled={isGeneratingContract}>
+                  {isGeneratingContract ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Draft...
+                    </>
+                  ) : (
+                    'Generate Draft'
+                  )}
                 </Button>
                 {process.env.NODE_ENV === 'development' && (
                   <Button
@@ -777,10 +779,11 @@ export default function Home() {
             </ReactMarkdown>
           </CardContent>
           {isEditing && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
-              <div className="text-center">
-                <p className="text-lg font-semibold">Editing in progress...</p>
-                <p className="text-sm text-gray-600">The AI is applying your changes.</p>
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+              <div className="text-center p-4 bg-white rounded-lg shadow-xl">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+                <p className="mt-2 text-lg font-semibold">Editing in progress...</p>
+                <p className="text-sm text-muted-foreground">The AI is applying your changes.</p>
               </div>
             </div>
           )}
@@ -798,9 +801,14 @@ export default function Home() {
           <CardContent className="flex-1">
             <div className="h-full border rounded-md p-4 bg-gray-50 space-y-4 overflow-y-auto">
               {chatHistory.map((chat, index) => (
-                <div key={index} className="text-sm">
-                  <span className="font-bold">{chat.author}: </span>
-                  <span>{chat.message}</span>
+                <div key={index} className={`flex flex-col ${chat.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`rounded-lg px-3 py-2 max-w-[80%] ${
+                      chat.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}>
+                    <span className="text-sm">{chat.content}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -819,7 +827,12 @@ export default function Home() {
                     }}
                   />
                   <Button onClick={handleSendMessage} disabled={isEditing}>
-                    {isEditing ? 'Editing...' : 'Send'}
+                    {isEditing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Editing...
+                      </>
+                    ) : 'Send'}
                   </Button>
               </div>
           </CardFooter>
