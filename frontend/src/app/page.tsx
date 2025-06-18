@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -187,37 +188,51 @@ export default function Home() {
                     />
                     <div className="space-y-2">
                       <FormLabel>Durée</FormLabel>
-                      <div className="flex items-center space-x-2">
-                        <FormField
-                          control={form.control}
-                          name="hasInitialTerm"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="hasNoEndDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      <div className="flex items-center space-x-4 pt-2">
+                          <FormField
+                            control={form.control}
+                            name="hasNoEndDate"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange(checked);
+                                      if (checked) {
+                                        form.setValue('hasInitialTerm', false);
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  Durée Indéterminée (CDI)
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={form.control}
+                            name="hasInitialTerm"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange(checked);
+                                      if (checked) {
+                                        form.setValue('hasNoEndDate', false);
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  Durée Déterminée (CDD)
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
                       </div>
                     </div>
                   </div>
@@ -257,38 +272,28 @@ export default function Home() {
                 {/* Section: Avantages */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Avantages</h3>
-                  <FormField
-                    control={form.control}
-                    name="benefits"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Avantages</FormLabel>
-                        <FormControl>
-                          <div className="flex items-center space-x-2">
-                            {benefitOptions.map((option) => (
-                              <FormField
-                                key={option.id}
-                                control={field.control}
-                                name={`benefits.${option.id}`}
-                                render={({ field: optionField }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Checkbox
-                                        checked={optionField.value}
-                                        onCheckedChange={optionField.onChange}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            ))}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {benefitOptions.map((option) => (
+                        <FormField
+                          key={option.id}
+                          control={form.control}
+                          name={`benefits.${option.id}`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>{option.label}</FormLabel>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                  </div>
                   <FormField
                     control={form.control}
                     name="otherBenefits"
@@ -304,54 +309,57 @@ export default function Home() {
                   />
                 </div>
 
-                {/* Section: Conditions */}
+                {/* Section: Clauses Additionnelles */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Conditions</h3>
-                  <FormField
+                  <h3 className="text-lg font-semibold border-b pb-2">Clauses Additionnelles</h3>
+                   <FormField
                     control={form.control}
                     name="includeNda"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>NDA</FormLabel>
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Inclure une clause de non-divulgation (NDA) ?</FormLabel>
+                        </div>
                         <FormControl>
-                          <Checkbox
+                          <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
+                   <FormField
                     control={form.control}
                     name="includeNonCompetition"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Non-compétitivité</FormLabel>
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Inclure une clause de non-concurrence ?</FormLabel>
+                        </div>
                         <FormControl>
-                          <Checkbox
+                          <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
+                   <FormField
                     control={form.control}
                     name="attyInNotice"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Avocat dans la notification</FormLabel>
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                         <div className="space-y-0.5">
+                          <FormLabel className="text-base">Nommer un avocat dans la clause de notification ?</FormLabel>
+                        </div>
                         <FormControl>
-                          <Checkbox
+                           <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -359,15 +367,19 @@ export default function Home() {
 
                 {/* Section: Prose */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Prose</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">Instructions Spécifiques</h3>
                   <FormField
                     control={form.control}
                     name="prose"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Prose</FormLabel>
+                        <FormLabel>Autres éléments ou clauses spécifiques à inclure (en langage courant) :</FormLabel>
                         <FormControl>
-                          <Textarea {...field} />
+                          <Textarea 
+                            placeholder="Ex: 'Ajouter une clause spécifiant que l'employé doit utiliser son propre matériel informatique.'"
+                            className="min-h-[100px]" 
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -375,7 +387,7 @@ export default function Home() {
                   />
                 </div>
 
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
                   {isLoading ? 'Génération en cours...' : 'Générer le Brouillon'}
                 </Button>
               </form>
