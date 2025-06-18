@@ -151,8 +151,8 @@ export default function Home() {
   const renderForm = () => (
     <div className="w-full max-w-4xl mx-auto">
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Creation Assistant: Employment Agreement</CardTitle>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Creation Assistant: Employment Agreement</CardTitle>
           <CardDescription>
             Fill out the fields below to generate a first draft.
           </CardDescription>
@@ -445,9 +445,20 @@ export default function Home() {
                 />
               </div>
 
-              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-                {isLoading ? 'Generating Draft...' : 'Generate Draft'}
-              </Button>
+              <div className="flex items-center justify-center space-x-4 pt-4">
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Generating Draft...' : 'Generate Draft'}
+                </Button>
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    variant="link"
+                    type="button"
+                    onClick={() => setGeneratedContract(MOCK_CONTRACT_DATA)}
+                  >
+                    (DEV) Bypass Form
+                  </Button>
+                )}
+              </div>
             </form>
           </Form>
         </CardContent>
