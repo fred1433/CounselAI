@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const contractSchema = z.object({
   employerName: z.string().min(2, { message: "Le nom de l'employeur doit contenir au moins 2 caractères." }),
   employeeName: z.string().min(2, { message: "Le nom de l'employé(e) doit contenir au moins 2 caractères." }),
+  companyBusiness: z.string().optional(),
   jobTitle: z.string().min(3, { message: "Le titre du poste doit contenir au moins 3 caractères." }),
   jobDescription: z.string().optional(),
   startDate: z.string().min(1, { message: "La date de début est requise." }),

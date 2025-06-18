@@ -231,11 +231,12 @@ export default function Home() {
   const form = useForm({
     resolver: zodResolver(contractSchema),
     defaultValues: {
-      employerName: "",
-      employeeName: "",
-      jobTitle: "",
+      employerName: "Innovatech Solutions",
+      employeeName: "Alice Dubois",
+      jobTitle: "Senior Software Engineer",
+      companyBusiness: "",
       jobDescription: "",
-      startDate: "",
+      startDate: new Date().toISOString().split('T')[0],
       hasInitialTerm: false,
       hasNoEndDate: false,
       onSitePresence: "",
@@ -391,6 +392,35 @@ export default function Home() {
     }
   };
 
+  const handleGenerateDescription = async () => {
+    // Manually trigger validation for the fields needed for generation
+    const isValid = await form.trigger(['jobTitle', 'employerName']);
+
+    // If validation fails, the error messages will be displayed automatically
+    // by the FormMessage components, and we can abort the function.
+    if (!isValid) {
+      return;
+    }
+
+    try {
+      const { jobTitle, employerName } = form.getValues();
+      
+      const response = await axios.post('http://localhost:3001/api/v1/contracts/generate-description', {
+        jobTitle,
+        companyName: employerName,
+        companyBusiness: form.getValues('companyBusiness'),
+      });
+
+      if (response.data && response.data.description) {
+        form.setValue('jobDescription', response.data.description);
+      }
+
+    } catch (error) {
+      console.error('Failed to generate description:', error);
+      // Here we could show a toast notification for server errors
+    }
+  };
+
   const renderForm = () => (
     <div className="w-full max-w-4xl mx-auto">
       <Card className="w-full">
@@ -439,35 +469,43 @@ export default function Home() {
               {/* Section: Position */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Position</h3>
-                <FormField
-                  control={form.control}
-                  name="jobTitle"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Senior Software Engineer" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="jobDescription"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Describe the main responsibilities, daily tasks, and objectives of the position..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="jobTitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Senior Software Engineer" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="jobDescription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Job Description</FormLabel>
+                          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={handleGenerateDescription}>
+                            Generate with AI
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the main responsibilities, duties, and required qualifications for the role."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               {/* Section: Terms */}
@@ -664,7 +702,20 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-        </div>
+                <FormField
+                  control={form.control}
+                  name="companyBusiness"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Business (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Develops AI-powered legal tech" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Section: Prose */}
               <div className="space-y-4">
