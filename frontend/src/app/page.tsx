@@ -265,7 +265,7 @@ export default function Home() {
     setIsGeneratingContract(true);
     setGeneratedContract('');
     try {
-      const response = await axios.post('http://localhost:3001/api/v1/contracts/generate', data);
+      const response = await axios.post('/api/v1/contracts/generate', data);
       if (response.data && response.data.contract) {
         setGeneratedContract(response.data.contract);
       } else {
@@ -407,7 +407,7 @@ export default function Home() {
     try {
       const { jobTitle, employerName } = form.getValues();
       
-      const response = await axios.post('http://localhost:3001/api/v1/contracts/generate-description', {
+      const response = await axios.post('/api/v1/contracts/generate-description', {
         jobTitle,
         companyName: employerName,
       });
