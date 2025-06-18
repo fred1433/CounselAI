@@ -29,6 +29,8 @@ import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { io, Socket } from 'socket.io-client';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas-pro';
 
 // For development: initialize with mock data to bypass the form.
 const MOCK_CONTRACT_DATA = `# EMPLOYMENT AGREEMENT
@@ -329,6 +331,66 @@ export default function Home() {
     }
   };
   
+  const handleExportPDF = () => {
+    const input = document.getElementById('contract-content');
+    if (input) {
+      // Use scrollHeight to ensure the whole content is captured vertically
+      // Let html2canvas determine the width automatically from the element's CSS
+      html2canvas(input, {
+        scale: 2, // Higher scale for better quality render
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        height: input.scrollHeight,
+        windowHeight: input.scrollHeight,
+      }).then(canvas => {
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        const pdf = new jsPDF({
+          orientation: 'p',
+          unit: 'pt', // Use points as unit, standard for PDF
+          format: 'a4',
+        });
+
+        const pdfPageWidth = pdf.internal.pageSize.getWidth();
+        const pdfPageHeight = pdf.internal.pageSize.getHeight();
+        
+        const margin = 40; // 40pt margin on each side
+        const contentWidth = pdfPageWidth - (margin * 2);
+        const contentHeight = pdfPageHeight - (margin * 2);
+
+        let sourceImageY = 0; // The y-coordinate of the top of the slice from the source canvas
+        let heightLeftOnCanvas = canvasHeight;
+
+        while (heightLeftOnCanvas > 0) {
+          if (sourceImageY > 0) {
+            pdf.addPage();
+          }
+
+          const heightToDrawOnPdf = Math.min(contentHeight, (heightLeftOnCanvas * contentWidth) / canvasWidth);
+          const heightToSliceFromCanvas = (heightToDrawOnPdf / contentWidth) * canvasWidth;
+
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvasWidth;
+          sliceCanvas.height = heightToSliceFromCanvas;
+          const ctx = sliceCanvas.getContext('2d');
+          
+          if(ctx) {
+            ctx.drawImage(canvas, 0, sourceImageY, canvasWidth, heightToSliceFromCanvas, 0, 0, canvasWidth, heightToSliceFromCanvas);
+            pdf.addImage(sliceCanvas, 'PNG', margin, margin, contentWidth, heightToDrawOnPdf);
+          }
+
+          heightLeftOnCanvas -= heightToSliceFromCanvas;
+          sourceImageY += heightToSliceFromCanvas;
+        }
+
+        pdf.save('contract-draft.pdf');
+      }).catch(err => {
+        console.error("html2canvas-pro failed:", err);
+      });
+    }
+  };
+
   const renderForm = () => (
     <div className="w-full max-w-4xl mx-auto">
       <Card className="w-full">
@@ -602,7 +664,7 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-              </div>
+        </div>
 
               {/* Section: Prose */}
               <div className="space-y-4">
@@ -652,10 +714,13 @@ export default function Home() {
       {/* Left side: Document */}
       <div className="flex-1">
         <Card className="h-full relative max-h-[calc(100vh-6rem)] flex flex-col">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contract Draft</CardTitle>
+            <Button onClick={handleExportPDF} variant="outline">
+              Export as PDF
+            </Button>
           </CardHeader>
-          <CardContent className="prose max-w-none flex-1 overflow-y-auto">
+          <CardContent id="contract-content" className="prose max-w-none flex-1 overflow-y-auto p-6">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {generatedContract}
             </ReactMarkdown>
