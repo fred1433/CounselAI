@@ -12,17 +12,37 @@ services:
       - counselai-net
     restart: unless-stopped
 
-  frontend:
+  # frontend-prod:
+  #   build:
+  #     context: .
+  #     dockerfile: frontend/Dockerfile
+  #     target: runner # Use the 'runner' stage for production
+  #   container_name: counselai-frontend-prod
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - counselai-net
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+
+  frontend-dev:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: counselai-frontend
+      target: dev # Use the 'dev' stage for development
+    container_name: counselai-frontend-dev
     ports:
       - "3000:3000"
     networks:
       - counselai-net
     depends_on:
       - backend
+    volumes:
+      # Mount the frontend source code for hot-reloading
+      - ./frontend:/usr/src/app
+      # Exclude node_modules from being overwritten by the mount
+      - /usr/src/app/node_modules
     restart: unless-stopped
 
 networks:

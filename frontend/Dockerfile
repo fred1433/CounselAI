@@ -5,7 +5,15 @@ WORKDIR /usr/src/app
 COPY frontend/package*.json ./
 RUN npm ci
 
-# Stage 2: Build the application
+# Stage 2: Development server
+FROM node:20-slim AS dev
+WORKDIR /usr/src/app
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY frontend/ .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# Stage 3: Build the application
 FROM node:20-slim AS builder
 WORKDIR /usr/src/app
 
@@ -16,7 +24,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN npm run build
 
-# Stage 3: Production image
+# Stage 4: Production image
 FROM node:20-slim AS runner
 WORKDIR /usr/src/app
 
