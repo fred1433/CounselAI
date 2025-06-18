@@ -282,21 +282,12 @@ export default function Home() {
 
   // Effect to manage WebSocket connection
   useEffect(() => {
-    if (!generatedContract) return;
-
-    // Set an initial welcome message from the assistant
-    setChatHistory([{
-      role: 'assistant',
-      content: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
-    }]);
-
-    // Make sure to use the correct backend URL
-    const newSocket = io('http://localhost:3001'); 
+    // This effect runs only once when the component mounts
+    const newSocket = io('http://localhost:3001');
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Connected to WebSocket server');
-      // setChatHistory(prev => [...prev, { author: 'System', message: 'Connected to the server.' }]);
     });
 
     newSocket.on('contractUpdated', (newContract: string) => {
@@ -312,12 +303,24 @@ export default function Home() {
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
-       //  setChatHistory(prev => [...prev, { author: 'System', message: 'Disconnected from the server.' }]);
     });
 
+    // Cleanup function to disconnect the socket when the component unmounts
     return () => {
       newSocket.disconnect();
     };
+  }, []); // The empty dependency array ensures this runs only once
+
+  // Effect to set the initial chat message when the contract is first generated
+  useEffect(() => {
+    if (generatedContract && chatHistory.length === 0) {
+      setChatHistory([{
+        role: 'assistant',
+        content: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
+      }]);
+    }
+    // This effect depends on generatedContract, but not on chatHistory to avoid loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedContract]);
 
   const handleSendMessage = () => {

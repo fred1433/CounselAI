@@ -32,6 +32,9 @@ export class ContractsGateway {
         data.message,
       );
 
+      // Log the raw response from the LLM
+      console.log('Raw LLM Response:', JSON.stringify(newContract, null, 2));
+
       // Sanitize the LLM response to remove markdown code blocks
       let sanitizedContract = newContract;
       const markdownBlockRegex = /^```markdown\n(.*)\n```$/s;
