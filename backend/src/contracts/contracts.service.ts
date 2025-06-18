@@ -39,46 +39,45 @@ export class ContractsService {
   private buildPrompt(data: GenerateContractDto): string {
     const benefitsList = Object.entries(data.benefits)
       .filter(([, value]) => value)
-      .map(([key]) => `- ${key.replace(/([A-Z])/g, ' $1').trim()}`) // Formatage du nom
+      .map(([key]) => `- ${key.replace(/([A-Z])/g, ' $1').trim()}`) // Format a readable name
       .join('\n');
     
-    // Construction d'un prompt détaillé pour l'IA
     return `
-      Rédigez un contrat de travail formel et professionnel en français.
-      Le ton doit être juridique mais clair.
-      Voici les détails du contrat :
+      Act as an expert US-based lawyer. Draft a formal and professional employment agreement based on the following details.
+      The tone should be legal, clear, and compliant with standard US employment law.
+      The output should be in Markdown format.
 
-      **Parties :**
-      - Employeur : ${data.employerName}
-      - Employé(e) : ${data.employeeName}
+      **Parties:**
+      - Employer: ${data.employerName}
+      - Employee: ${data.employeeName}
 
-      **Poste :**
-      - Titre du poste : ${data.jobTitle}
-      - Description : ${data.jobDescription}
+      **Position:**
+      - Job Title: ${data.jobTitle}
+      - Job Description: ${data.jobDescription}
 
-      **Termes du contrat :**
-      - Date de début : ${data.startDate}
-      - Durée : ${data.hasNoEndDate ? 'Indéterminée (CDI)' : `Terme initial défini (CDD)`}
-      - Présence sur site : ${data.onSitePresence}
+      **Terms:**
+      - Start Date: ${data.startDate}
+      - Term: ${data.hasNoEndDate ? 'At-will employment (no fixed term)' : 'Fixed initial term'}
+      - On-site Presence: ${data.onSitePresence}
 
-      **Rémunération :**
-      - Salaire : ${data.salary}
+      **Compensation:**
+      - Salary: ${data.salary}
 
-      **Avantages sociaux :**
+      **Benefits:**
       ${benefitsList}
-      ${data.otherBenefits ? `- Autres : ${data.otherBenefits}`: ''}
+      ${data.otherBenefits ? `- Other: ${data.otherBenefits}`: ''}
 
-      **Clauses Additionnelles :**
-      - Inclure une clause de non-divulgation (NDA) : ${data.includeNda ? 'Oui' : 'Non'}
-      - Inclure une clause de non-concurrence : ${data.includeNonCompetition ? 'Oui' : 'Non'}
-      - Nommer un avocat dans la clause de notification : ${data.attyInNotice ? 'Oui' : 'Non'}
+      **Additional Clauses:**
+      - Include NDA: ${data.includeNda ? 'Yes' : 'No'}
+      - Include Non-Competition Clause: ${data.includeNonCompetition ? 'Yes' : 'No'}
+      - Attorney to be named in the Notice provision: ${data.attyInNotice ? 'Yes' : 'No'}
       
-      **Instructions spécifiques supplémentaires (Prose) :**
+      **Other Specifics (Prose):**
       "${data.prose}"
 
       ---
-      Générez le texte complet du contrat basé sur ces informations.
-      Structurez le document avec des articles et des sections claires (ex: Article 1 - Fonctions, Article 2 - Rémunération, etc.).
+      Generate the full text of the employment agreement based on this information.
+      Structure the document with clear sections and clauses (e.g., 1. Position, 2. Compensation, etc.).
     `;
   }
 } 
