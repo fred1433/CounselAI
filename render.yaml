@@ -1,0 +1,42 @@
+services:
+  # Service pour le Backend NestJS
+  - type: web
+    name: counselai-backend
+    env: node
+    region: oregon # Ou une autre région de votre choix : oregon, ohio, singapore
+    plan: free # Spécifie le plan gratuit
+    rootDir: ./backend
+    buildCommand: |
+      npm install
+      npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /api/v1
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 10000 # Render fournit le port, mais nous le fixons ici pour être explicite
+      # Ajoutez ici d'autres variables d'environnement nécessaires pour le backend (ex: BDD_URL)
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: your_database_name
+      #     property: connectionString
+
+  # Service pour le Frontend Next.js
+  - type: web
+    name: counselai-frontend
+    env: node
+    region: oregon # Assurez-vous que c'est la même région que le backend
+    plan: free
+    rootDir: ./frontend
+    buildCommand: |
+      npm install
+      npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Variable d'environnement pour l'URL de l'API Backend
+      # L'URL est basée sur le nom du service backend
+      - key: NEXT_PUBLIC_API_URL
+        value: https://counselai-backend.onrender.com/api/v1

@@ -1,0 +1,703 @@
+diff --git a/backend/src/main.ts b/backend/src/main.ts
+index 050e288..60a0b00 100644
+--- a/backend/src/main.ts
++++ b/backend/src/main.ts
+@@ -7,7 +7,9 @@ async function bootstrap() {
+ 
+   // Enable CORS
+   app.enableCors({
+-    origin: 'http://localhost:3000', // Allow our frontend
++    origin: [process.env.FRONTEND_URL, 'http://localhost:3000'].filter(Boolean),
++    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
++    credentials: true,
+   });
+ 
+   // Global Validation Pipe
+@@ -20,6 +22,8 @@ async function bootstrap() {
+   // Set a global prefix
+   app.setGlobalPrefix('api/v1');
+   
+-  await app.listen(process.env.PORT ?? 3001);
++  const port = process.env.PORT || 3000;
++  await app.listen(port, '0.0.0.0');
++  console.log(`Application is running on: ${await app.getUrl()}`);
+ }
+ bootstrap();
+diff --git a/backend/test_e2e.js b/backend/test_e2e.js
+index 058fb97..05610fe 100644
+--- a/backend/test_e2e.js
++++ b/backend/test_e2e.js
+@@ -4,7 +4,7 @@ const fs = require('fs');
+ const API_URL = 'http://localhost:3001/api/v1/contracts/generate';
+ const MODEL_TO_USE = 'gemini-2.5-pro';
+ 
+-const basePayload = {
++const comprehensivePayload = {
+   employerName: 'Innovatech Solutions',
+   employeeName: 'Dr. Evelyn Reed',
+   jobTitle: 'Principal Research Scientist, AI Ethics',
+@@ -13,34 +13,23 @@ const basePayload = {
+   hasInitialTerm: false,
+   hasNoEndDate: true,
+   salary: '$280,000 USD per annum',
+-  benefits: { 
+-    health: true, dental: true, vacationSick: true, parking: true,
+-    profitSharing: true, fourZeroOneK: true, paidBarMembership: false,
+-    clePaid: false, cellPhone: true,
++  benefits: {
++    health: true,
++    dental: true,
++    vacationSick: true,
++    parking: true,
++    profitSharing: true,
++    fourZeroOneK: true,
++    paidBarMembership: false,
++    clePaid: false,
++    cellPhone: true,
+   },
+-  prose: 'Governing law is Delaware.',
+-};
+-
+-const payloadWithNda = {
+-  ...basePayload,
++  otherBenefits: 'Annual budget of $5,000 for conferences and professional development.',
+   includeNda: true,
+-  includeNonCompetition: false,
+-  attyInNotice: false,
+-};
+-
+-const payloadWithoutNda = {
+-  ...basePayload,
+-  includeNda: false,
+-  includeNonCompetition: false,
+-  attyInNotice: false,
+-};
+-
+-const payloadWithAttorney = {
+-  ...basePayload,
+-  includeNda: false,
+-  includeNonCompetition: false,
++  includeNonCompetition: true,
+   attyInNotice: true,
+   attorneyName: 'Claire Kent, Esq.',
++  prose: 'Governing law is Delaware. Add a clause for a $10,000 signing bonus.',
+ };
+ 
+ async function runTest(payload, testName) {
+@@ -76,25 +65,21 @@ async function runTest(payload, testName) {
+   }
+ }
+ 
+-async function runAllTests() {
+-    console.log('--- Full End-to-End Test Suite Started ---');
++async function runComprehensiveTest() {
++    console.log('--- Comprehensive E2E Test Started ---');
+     
+-    const resultWithNda = await runTest(payloadWithNda, 'Avec_NDA');
+-    console.log('\\n' + '-'.repeat(40) + '\\n');
+-    const resultWithoutNda = await runTest(payloadWithoutNda, 'Sans_NDA');
+-    console.log('\\n' + '-'.repeat(40) + '\\n');
+-    const resultWithAttorney = await runTest(payloadWithAttorney, 'Avec_Avocat');
++    const success = await runTest(comprehensivePayload, 'Comprehensive_Test');
+     
+     console.log('\\n' + '-'.repeat(40) + '\\n');
+ 
+-    if (resultWithNda && resultWithoutNda && resultWithAttorney) {
+-        console.log('🎉 All tests completed successfully. Please review the generated files to confirm the output.');
++    if (success) {
++        console.log('🎉 Test completed successfully. Please review the generated file.');
+     } else {
+-        console.error('🔥 One or more tests failed.');
++        console.error('🔥 Test failed.');
+         process.exit(1);
+     }
+     console.log('--- Test Finished ---');
+ }
+ 
+ // Give the server a moment to start up
+-setTimeout(runAllTests, 2000); 
+\ No newline at end of file
++setTimeout(runComprehensiveTest, 2000); 
+\ No newline at end of file
+diff --git a/docker-compose.yml b/docker-compose.yml
+index b1de44e..5369007 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -12,39 +12,39 @@ services:
+       - counselai-net
+     restart: unless-stopped
+ 
+-  # frontend-prod:
+-  #   build:
+-  #     context: .
+-  #     dockerfile: frontend/Dockerfile
+-  #     target: runner # Use the 'runner' stage for production
+-  #   container_name: counselai-frontend-prod
+-  #   ports:
+-  #     - "3000:3000"
+-  #   networks:
+-  #     - counselai-net
+-  #   depends_on:
+-  #     - backend
+-  #   restart: unless-stopped
+-
+-  frontend-dev:
++  frontend-prod:
+     build:
+       context: ./frontend
+       dockerfile: Dockerfile
+-      target: dev # Use the 'dev' stage for development
+-    container_name: counselai-frontend-dev
++      target: runner # Use the 'runner' stage for production
++    container_name: counselai-frontend-prod
+     ports:
+       - "3000:3000"
+     networks:
+       - counselai-net
+     depends_on:
+       - backend
+-    volumes:
+-      # Mount the frontend source code for hot-reloading
+-      - ./frontend:/usr/src/app
+-      # Exclude node_modules from being overwritten by the mount
+-      - /usr/src/app/node_modules
+     restart: unless-stopped
+ 
++  # frontend-dev:
++  #   build:
++  #     context: ./frontend
++  #     dockerfile: Dockerfile
++  #     target: dev # Use the 'dev' stage for development
++  #   container_name: counselai-frontend-dev
++  #   ports:
++  #     - "3000:3000"
++  #   networks:
++  #     - counselai-net
++  #   depends_on:
++  #     - backend
++  #   volumes:
++  #     # Mount the frontend source code for hot-reloading
++  #     - ./frontend:/usr/src/app
++  #     # Exclude node_modules from being overwritten by the mount
++  #     - /usr/src/app/node_modules
++  #   restart: unless-stopped
++
+ networks:
+   counselai-net:
+     driver: bridge 
+\ No newline at end of file
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index e7afe2a..5eb05a3 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -2134,7 +2134,6 @@
+       "version": "19.1.8",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.1.8.tgz",
+       "integrity": "sha512-AwAfQ2Wa5bCx9WP8nZL2uMZWod7J7/JSplxbTmBQ5ms6QpqNYm672H0Vu9ZVKVngQ+ii4R/byguVEUZQyeg44g==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "csstype": "^3.0.2"
+@@ -2144,7 +2143,7 @@
+       "version": "19.1.6",
+       "resolved": "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.1.6.tgz",
+       "integrity": "sha512-4hOiT/dwO8Ko0gV1m/TJZYk3y0KBnY9vzDh7W+DH17b2HFSOGgdj33dhihPeuy3l0q23+4e+hoXHV6hCC4dCXw==",
+-      "dev": true,
++      "devOptional": true,
+       "license": "MIT",
+       "peerDependencies": {
+         "@types/react": "^19.0.0"
+@@ -3463,7 +3462,6 @@
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.1.3.tgz",
+       "integrity": "sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/damerau-levenshtein": {
+diff --git a/frontend/package.json b/frontend/package.json
+index a9061c2..8983fa2 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -5,7 +5,7 @@
+   "scripts": {
+     "dev": "next dev",
+     "build": "next build",
+-    "start": "next start",
++    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+     "lint": "next lint"
+   },
+   "dependencies": {
+diff --git a/frontend/src/app/page.tsx b/frontend/src/app/page.tsx
+index 2d8b946..9f09be4 100644
+--- a/frontend/src/app/page.tsx
++++ b/frontend/src/app/page.tsx
+@@ -33,181 +33,6 @@ import { Loader2, ChevronDown } from 'lucide-react';
+ import ContractEditor from '@/components/ContractEditor';
+ import FileUploader from '@/components/FileUploader';
+ 
+-// For development: initialize with mock data to bypass the form.
+-const MOCK_CONTRACT_DATA = `# EMPLOYMENT AGREEMENT
+-
+-This Employment Agreement (the "Agreement") is made effective as of the last date of signature below (the "Effective Date"), by and between:
+-
+-**INNOVATECH SOLUTIONS**, a [State of Incorporation, e.g., Delaware] corporation, with its principal place of business at [Company Address, e.g., 123 Tech Drive, Silicon Valley, CA 90210, USA] (the "Company");
+-
+-AND
+-
+-**ALICE DUBOIS**, an individual residing at [Employee Address, e.g., 45 Rue de la Paix, 75002 Paris, France] (the "Employee").
+-
+-The Company and Employee are hereinafter collectively referred to as the "Parties" and individually as a "Party."
+-
+-**WHEREAS**, the Company desires to employ Employee, and Employee desires to be employed by the Company, upon the terms and conditions hereinafter set forth;
+-
+-**NOW, THEREFORE**, in consideration of the mutual covenants and promises contained herein and other good and valuable consideration, the receipt and sufficiency of which are hereby acknowledged, the Parties agree as follows:
+-
+----
+-
+-## 1. POSITION AND DUTIES
+-
+-1.1. **Job Title:** The Company hereby employs Employee in the position of **Lead Data Scientist**.
+-
+-1.2. **Job Description:** As Lead Data Scientist, Employee shall be responsible for leading the data science team to develop machine learning models for personalized user experiences. Employee's responsibilities will include, but not be limited to, project planning, mentoring junior scientists, and communicating findings to stakeholders. Employee shall perform such other duties as may be assigned by the Company from time to time, consistent with the Employee's position and the needs of the Company's business.
+-
+-1.3. **Reporting Relationship:** Employee shall report directly to [Insert Supervisor's Title, e.g., the Head of AI & Machine Learning] or such other person as the Company may designate.
+-
+----
+-
+-## 2. EMPLOYMENT TERM
+-
+-2.1. **Start Date:** Employee's employment with the Company shall commence on **August 1, 2025** (the "Start Date").
+-
+-2.2. **At-Will Employment:** Employee's employment with the Company is and shall remain "at-will." This means that either the Employee or the Company may terminate the employment relationship at any time, with or without cause or advance notice, for any reason not prohibited by law. Nothing in this Agreement, nor in any Company policy or practice, shall be construed to create a contract of employment for a definite term. The at-will nature of this employment may only be modified by an express written agreement signed by the Employee and a duly authorized officer of the Company.
+-
+----
+-
+-## 3. WORK LOCATION AND SCHEDULE
+-
+-3.1. **Primary Work Location:** Employee's primary work location will be a hybrid arrangement. Employee is required to be present at the Company's Paris office for **three (3) days per week**. The specific days will be determined by mutual agreement with Employee's supervisor, subject to the Company's operational needs. For the remaining workdays, Employee may work remotely.
+-
+-3.2. **Business Travel:** Employee may be required to travel periodically for business purposes, including to the Company's principal offices or other locations as reasonably required by the Company.
+-
+----
+-
+-## 4. COMPENSATION
+-
+-4.1. **Base Salary:** As compensation for the services rendered under this Agreement, the Company shall pay Employee a gross annual base salary of **Ninety-Five Thousand Euros (€95,000)**, payable in accordance with the Company's standard payroll practices, less all applicable taxes and withholdings.
+-
+-4.2. **Review:** Employee's compensation will be subject to annual review and may be adjusted at the Company's sole discretion.
+-
+----
+-
+-## 5. BENEFITS
+-
+-5.1. **Standard Benefits:** Employee shall be eligible to participate in the following Company-sponsored benefits programs, subject to the terms and conditions of each plan and applicable eligibility requirements, as they may be amended from time to time:
+- a.  **Health Insurance:** Medical coverage.
+-    b.  **Dental Insurance:** Dental coverage.
+-    c.  **Vacation and Sick Leave:** Accrued paid time off for vacation and sick leave, in accordance with the Company's then-current policies.
+-    d.  **Profit Sharing Plan:** Participation in the Company's profit sharing plan, if and when available, subject to plan terms.
+-    e. **Cell Phone:** Reimbursement for reasonable business use of a personal cell phone or provision of a Company-owned cell phone, in accordance with Company policy.
+-
+-5.2. **Professional Development Budget:** The Company shall provide Employee with an annual budget of **One Thousand Five Hundred Euros (€1,500)** for professional development and conferences, subject to Company approval and expense reimbursement policies. Unused portions of this budget do not roll over to subsequent years.
+-
+-5.3. **Stock Options:** Employee will be granted stock options in the Company, which shall vest over a four (4)-year period, subject to Employee's continuous employment with the Company. The specific terms and conditions of the stock option grant, including the number of options, exercise price, vesting schedule, and other provisions, will be set forth in a separate Stock Option Agreement and governed by the Company's applicable stock option plan document, which Employee will be required to acknowledge and sign.
+-
+-5.4. **Modification of Benefits:** The Company reserves the right to modify, amend, suspend, or terminate any of its benefit plans or programs at any time, with or without notice, in its sole discretion.
+-
+----
+-
+-## 6. CONFIDENTIALITY, NON-DISCLOSURE, AND PROPRIETARY INFORMATION
+-
+-6.1. **Acknowledgment:** Employee acknowledges that in the course of performing services for the Company, Employee will have access to and develop Confidential Information (as defined below) that is valuable, special, and unique to the business of the Company. Employee agrees that the Company will suffer irreparable harm if Employee breaches the obligations set forth in this Section 6, and monetary damages will be inadequate to compensate the Company for such a breach.
+-
+-6.2. **Confidential Information:** "Confidential Information" means any and all non-public information, in any form or medium, belonging to, used by, or concerning the Company's business, including but not limited to, trade secrets, financial data, business plans, product specifications, development plans, marketing strategies, customer lists, pricing strategies, technical data, research, formulas, algorithms, software, designs, ideas, inventions, processes, computer programs, data compilations, know-how, and any information concerning the Company's employees.
+-
+-6.3. **Obligations:** Employee agrees that during the term of employment and at all times thereafter, Employee shall:
+-    a.  Hold all Confidential Information in strict confidence and trust.
+-    b.  Not use Confidential Information for any purpose other than for the benefit of the Company.
+-  c.  Not disclose, publish, or disseminate Confidential Information to any third party without the prior written consent of the Company.
+-    d.  Take all reasonable precautions to prevent the unauthorized use, disclosure, or dissemination of Confidential Information.
+-
+-6.4. **Exclusions:** Confidential Information does not include information that: (a) is or becomes publicly known through no fault of Employee; (b) is lawfully received by Employee from a third party without restriction and without breach of this Agreement; (c) is independently developed by Employee without use of or reference to Confidential Information; or (d) is required to be disclosed by law or court order, provided Employee gives the Company prompt notice of such requirement prior to disclosure.
+-
+----
+-
+-## 7. INTELLECTUAL PROPERTY ASSIGNMENT
+-
+-7.1. **Company Property:** Employee agrees that all works of authorship, inventions, discoveries, improvements, processes, designs, software, computer programs, ideas, data, and information (collectively, "Inventions") that Employee creates, conceives, discovers, or develops, either alone or with others, (a) during the period of employment, (b) within the scope of employment, (c) using Company resources, or (d) that relate to the Company's actual or anticipated business, research, or development, are "Company Inventions."
+-
+-7.2. **Assignment:** Employee hereby irrevocably assigns to the Company all right, title, and interest in and to all Company Inventions, including all intellectual property rights therein (including, without limitation, all patents, copyrights, trademarks, trade secrets, and other proprietary rights). Employee agrees that all Company Inventions that are copyrightable works shall be considered "works made for hire" as that term is defined in the United States Copyright Act.
+-
+-7.3. **Further Assurances:** Employee agrees to execute any and all documents and to do all acts necessary or desirable, at the Company's expense, to perfect the Company's ownership of and to assist the Company in obtaining and enforcing patent, copyright, trademark, and other intellectual property rights in Company Inventions.
+-
+----
+-
+-## 8. NON-COMPETITION AND NON-SOLICITATION
+-
+-8.1. **Non-Competition:** During Employee's employment with the Company and for a period of **twelve (12) months** following the termination of Employee's employment for any reason (the "Restricted Period"), Employee shall not, directly or indirectly, engage in, be employed by, consult for, own, manage, operate, control, or participate in the ownership, management, operation, or control of any business that competes with the Company's business (including, but not limited to, the development of machine learning models for personalized user experiences) within any geographic area where the Company conducts business or has concrete plans to conduct business (the "Restricted Territory"). This restriction is limited to activities similar to those performed by Employee for the Company or activities that would involve the use of Confidential Information gained during Employee's employment.
+-
+-8.2. **Non-Solicitation of Customers:** During the Restricted Period, Employee shall not, directly or indirectly, solicit or attempt to solicit, for the purpose of providing products or services competitive with those provided by the Company, any person or entity who was a customer, client, or active prospective customer of the Company with whom Employee had material contact during the last twelve (12) months of employment.
+-
+-8.3. **Non-Solicitation of Employees:** During the Restricted Period, Employee shall not, directly or indirectly, solicit or induce any employee of the Company to leave their employment with the Company or hire any employee who has terminated their employment with the Company within six (6) months of such termination.
+-
+-8.4. **Reasonableness:** Employee acknowledges that the duration, geographic scope, and scope of activity of these restrictions are reasonable and necessary to protect the Company's legitimate business interests, including its Confidential Information, goodwill, and customer relationships. If any part of this Section 8 is found to be unreasonable, unlawful, or unenforceable, it shall be modified or severed to the extent necessary to make it enforceable, and the remainder of the Section shall remain in full force and effect.
+-
+----
+-
+-## 9. TERMINATION OF EMPLOYMENT
+-
+-9.1. **At-Will Termination:** As set forth in Section 2.2, Employee's employment is at-will and may be terminated by either Party at any time, with or without cause or advance notice.
+-
+-9.2. **Effect of Termination:** Upon termination of employment for any reason, Employee shall immediately return to the Company all Company property, including without limitation, equipment, documents, files, and all copies thereof, whether in hard copy or electronic form, that are in Employee's possession or control. Employee shall also fully cooperate with the Company in all matters relating to the winding up of Employee's services.
+-
+-9.3. **Accrued Obligations:** Upon termination, the Company shall pay Employee all earned but unpaid base salary up to the date of termination, as well as any accrued but unused vacation time in accordance with Company policy and applicable law. No severance pay or other termination benefits shall be payable unless otherwise agreed in writing by an authorized officer of the Company or as required by law.
+-
+----
+-
+-## 10. REPRESENTATIONS AND WARRANTIES OF EMPLOYEE
+-
+-10.1. **Authority:** Employee represents and warrants that Employee has the full right, power, and authority to enter into this Agreement and to perform all obligations hereunder.
+-
+-10.2. **No Conflicts:** Employee represents and warrants that the execution and delivery of this Agreement and the performance of Employee's duties hereunder will not violate or constitute a breach of any agreement, contract, or understanding to which Employee is a party or by which Employee is bound, including without limitation, any non-disclosure, non-competition, or intellectual property assignment agreement.
+-
+----
+-
+-## 11. GENERAL PROVISIONS
+-
+-11.1. **Governing Law:** This Agreement shall be governed by and construed in accordance with the laws of the **State of Delaware**, without regard to its conflict of laws principles. The Parties agree that any dispute arising out of or relating to this Agreement shall be brought exclusively in the state or federal courts located in the State of Delaware.
+-
+-11.2. **Entire Agreement:** This Agreement, together with any separate Stock Option Agreement and other Company benefit plan documents, constitutes the entire agreement between the Parties concerning the subject matter hereof and supersedes all prior agreements, discussions, and understandings, whether written or oral, between the Parties regarding Employee's employment with the Company.
+-
+-11.3. **Amendments:** This Agreement may not be amended or modified except by a written instrument signed by both the Company and Employee.
+-
+-11.4. **Severability:** If any provision of this Agreement is held to be invalid or unenforceable, the remaining provisions shall continue in full force and effect. If any provision is deemed invalid or unenforceable as applied to any person or circumstance, it shall be deemed valid and enforceable as applied to all other persons and circumstances.
+-
+-11.5. **Waiver:** No waiver by either Party of any breach of any provision of this Agreement shall be deemed a waiver of any subsequent or other breach of the same or any other provision.
+-
+-11.6. **Notices:** All notices required or permitted under this Agreement shall be in writing and delivered personally, by reputable overnight courier, or by certified mail, return receipt requested, to the addresses set forth below or to such other address as either Party may specify by notice to the other.
+-
+-**If to Company:**
+-Innovatech Solutions
+-[Company Address, e.g., 123 Tech Drive]
+-[City, State, Zip, e.g., Silicon Valley, CA 90210, USA]
+-Attention: Human Resources
+-
+-**If to Employee:**
+-Alice Dubois
+-[Employee Address, e.g., 45 Rue de la Paix]
+-[City, Postal Code, Country, e.g., 75002 Paris, France]
+-
+-11.7. **Headings:** The headings in this Agreement are for convenience only and shall not affect its interpretation.
+-
+-11.8. **Counterparts:** This Agreement may be executed in counterparts, each of which shall be deemed an original, but all of which together shall constitute one and the same instrument. Facsimile or electronic signatures shall be deemed original signatures for all purposes.
+-
+-11.9. **Acknowledgement:** Employee acknowledges that Employee has had the opportunity to review this Agreement and to consult with an attorney of Employee's choosing regarding its terms. Employee understands and agrees to be bound by the terms and conditions contained herein.
+-
+----
+-
+-**IN WITNESS WHEREOF**, the Parties have executed this Employment Agreement as of the dates set forth below.
+-
+-**INNOVATECH SOLUTIONS**
+-
+-By: _______________________________
+-Name: [Authorized Signatory Name]
+-Title: [Authorized Signatory Title]
+-Date: _______________________________
+-
+-**ALICE DUBOIS**
+-
+-Signature: ___________________________
+-Name: Alice Dubois
+-Date: _______________________________
+-`;
+-
+ const benefitOptions = [
+     { id: 'health', label: 'Health' },
+     { id: 'dental', label: 'Dental' },
+@@ -265,90 +90,62 @@ export default function Home() {
+   });
+ 
+   const attyInNotice = form.watch('attyInNotice');
++  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+ 
+   // This effect establishes the socket connection.
+   useEffect(() => {
+-    const newSocket = io('http://localhost:3001');
++    const newSocket = io(API_URL);
+     setSocket(newSocket);
+-    console.log('Socket instance created.');
+-
+-    // Cleanup function to disconnect the socket when the component unmounts.
+-    // This is crucial for React's StrictMode to prevent duplicate connections.
+-    return () => {
+-      console.log('Cleaning up and disconnecting socket.');
+-      newSocket.disconnect();
+-    };
+-  }, []); // Empty dependency array ensures this runs only on mount and unmount.
+-
+-  useEffect(() => {
+-    // This effect is responsible for handling socket event listeners.
+-    // It runs whenever the `socket` state changes.
+-    if (!socket) return;
+ 
+     const onConnect = () => {
+-      console.log('Socket connected!');
+-      // clear any previous chat history on new connection
+-      setChatHistory([]);
++      console.log('Connected to socket server');
+     };
+ 
+     const onDisconnect = () => {
+-      console.log('Socket disconnected!');
++      console.log('Disconnected from socket server');
+     };
+ 
+     const onContractUpdate = (data: {
+       contract: string;
+       requestId: string;
+     }) => {
+-      console.log(
+-        `[FRONTEND] Received contract_update with ID: ${data.requestId}`,
+-        data,
+-      );
++      console.log('Contract update received', data);
+       setGeneratedContract(data.contract);
+-      // Add only the assistant's final response to the history
+-      setChatHistory(prev => [...prev, { role: 'assistant', content: data.contract }]);
+-      setIsEditing(false);
+     };
+ 
+     const onGenerationComplete = (data: { contract: string }) => {
++      console.log('Generation complete:', data);
+       setGeneratedContract(data.contract);
+       setIsGeneratingContract(false);
+-      // Initialize chat history after generation
+-      setChatHistory([
+-        { role: 'assistant', content: data.contract }
+-      ]);
+     };
+ 
+     const onEditError = (data: { error: string; requestId?: string }) => {
+-      console.error(`[FRONTEND] Received edit_error for ID ${data.requestId}:`, data.error);
+-      setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${data.error}` }]);
++      console.error('Edit error from server:', data.error);
+       setIsEditing(false);
++      // Here you would typically show an error message to the user
+     };
+ 
+     const onLog = (data: { message: string; type?: string }) => {
+-      console.log(`[SERVER LOG] ${data.type || 'info'}: ${data.message}`);
++      console.log(`Log from server (${data.type || 'info'}):`, data.message);
+     };
+ 
+-    // Register event listeners
+-    socket.on('connect', onConnect);
+-    socket.on('disconnect', onDisconnect);
+-    socket.on('generation_complete', onGenerationComplete);
+-    socket.on('contract_update', onContractUpdate);
+-    socket.on('edit_error', onEditError);
+-    socket.on('log', onLog);
+-    console.log('Attaching socket listeners.');
+-
+-    // Cleanup function to remove event listeners when the component
+-    // re-renders or unmounts. Prevents duplicate event registrations.
++    newSocket.on('connect', onConnect);
++    newSocket.on('disconnect', onDisconnect);
++    newSocket.on('contractUpdate', onContractUpdate);
++    newSocket.on('generationComplete', onGenerationComplete);
++    newSocket.on('editError', onEditError);
++    newSocket.on('log', onLog);
++
+     return () => {
+-      console.log('Detaching socket listeners.');
+-      socket.off('connect', onConnect);
+-      socket.off('disconnect', onDisconnect);
+-      socket.off('generation_complete', onGenerationComplete);
+-      socket.off('contract_update', onContractUpdate);
+-      socket.off('edit_error', onEditError);
+-      socket.off('log', onLog);
++      newSocket.off('connect', onConnect);
++      newSocket.off('disconnect', onDisconnect);
++      newSocket.off('contractUpdate', onContractUpdate);
++      newSocket.off('generationComplete', onGenerationComplete);
++      newSocket.off('editError', onEditError);
++      newSocket.off('log', onLog);
++      newSocket.disconnect();
+     };
+-  }, [socket]); // This effect re-runs only when the socket instance changes.
++  }, [API_URL]); // Added API_URL to dependency array
+ 
+   async function onSubmit(data: ContractFormData) {
+     setIsGeneratingContract(true);
+@@ -367,7 +164,7 @@ export default function Home() {
+ 
+     try {
+       const response = await axios.post(
+-        'http://localhost:3001/api/v1/contracts/generate',
++        `${API_URL}/api/v1/contracts/generate`,
+         formData,
+         {
+           headers: {
+@@ -810,17 +607,19 @@ export default function Home() {
+                     control={form.control}
+                     name="attorneyName"
+                     render={({ field }) => (
+-                      <FormItem>
+-                        <FormLabel>Attorney's Name</FormLabel>
+-                        <FormControl>
+-                          <Input placeholder="e.g., John Doe, Esq." {...field} />
+-                        </FormControl>
+-                        <FormMessage />
+-                      </FormItem>
++                      <div className={attyInNotice ? 'space-y-2' : 'hidden'}>
++                        <FormItem>
++                          <FormLabel>Attorney&apos;s Name</FormLabel>
++                          <FormControl>
++                            <Input placeholder="Enter the attorney's name" {...field} />
++                          </FormControl>
++                          <FormMessage />
++                        </FormItem>
++                      </div>
+                     )}
+                   />
+                 )}
+-        </div>
++              </div>
+ 
+               {/* Section: Other Specifics */}
+               <div className="space-y-4">
+@@ -832,10 +631,10 @@ export default function Home() {
+                     <FormItem>
+                       <FormLabel>Other things to include (in prose):</FormLabel>
+                       <FormControl>
+-                        <Textarea 
+-                          placeholder="Ex: 'Add a clause specifying the employee must use their own computer equipment.'"
+-                          className="min-h-[100px]" 
+-                          {...field} 
++                        <Textarea
++                          placeholder="Example: Add a clause specifying the employee must use company-provided equipment."
++                          className="min-h-[100px]"
++                          {...field}
+                         />
+                       </FormControl>
+                       <FormMessage />
+@@ -940,7 +739,7 @@ export default function Home() {
+                   </div>
+                 </div>
+               )}
+-            </div>
++        </div>
+           </CardContent>
+           <CardFooter>
+             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2 w-full">
+diff --git a/frontend/src/lib/validation/contract-schema.ts b/frontend/src/lib/validation/contract-schema.ts
+index 662c852..ed1b7d1 100644
+--- a/frontend/src/lib/validation/contract-schema.ts
++++ b/frontend/src/lib/validation/contract-schema.ts
+@@ -1,30 +1,31 @@
+ import { z } from 'zod';
+ 
+ export const contractSchema = z.object({
+-  employerName: z.string().min(2, { message: "Employer name must be at least 2 characters." }),
+-  employeeName: z.string().min(1, { message: "Employee name is required." }),
+-  jobTitle: z.string().min(1, { message: "Job title is required." }),
++  employerName: z.string().min(1, 'Employer name is required.'),
++  employeeName: z.string().min(1, 'Employee name is required.'),
++  jobTitle: z.string().min(1, 'Job title is required.'),
+   jobDescription: z.string().optional(),
+-  startDate: z.string().min(1, { message: "Start date is required." }),
+-  hasInitialTerm: z.boolean().default(false),
+-  hasNoEndDate: z.boolean().default(false),
++  startDate: z.string().min(1, 'Start date is required.'),
++  hasInitialTerm: z.boolean().optional(),
++  hasNoEndDate: z.boolean().optional(),
+   onSitePresence: z.string().optional(),
+-  salary: z.string().min(1, { message: "Salary is required." }),
++  salary: z.string().min(1, 'Salary is required.'),
+   benefits: z.object({
+-    health: z.boolean().default(false),
+-    dental: z.boolean().default(false),
+-    vacationSick: z.boolean().default(false),
+-    parking: z.boolean().default(false),
+-    profitSharing: z.boolean().default(false),
+-    fourZeroOneK: z.boolean().default(false),
+-    paidBarMembership: z.boolean().default(false),
+-    clePaid: z.boolean().default(false),
+-    cellPhone: z.boolean().default(false),
++    health: z.boolean().optional(),
++    dental: z.boolean().optional(),
++    vacationSick: z.boolean().optional(),
++    parking: z.boolean().optional(),
++    profitSharing: z.boolean().optional(),
++    fourZeroOneK: z.boolean().optional(),
++    paidBarMembership: z.boolean().optional(),
++    clePaid: z.boolean().optional(),
++    cellPhone: z.boolean().optional(),
+   }).optional(),
+   otherBenefits: z.string().optional(),
+-  includeNda: z.boolean().default(false),
+-  includeNonCompetition: z.boolean().default(false),
+-  attyInNotice: z.boolean().default(false),
++  includeNda: z.boolean().optional(),
++  includeNonCompetition: z.boolean().optional(),
++  attyInNotice: z.boolean().optional(),
++  attorneyName: z.string().optional(),
+   prose: z.string().optional(),
+ });
+ 
+diff --git a/render.yaml b/render.yaml
+new file mode 100644
+index 0000000..650c267
+--- /dev/null
++++ b/render.yaml
+@@ -0,0 +1,40 @@
++services:
++  # Backend Service (NestJS)
++  - type: web
++    name: counselai-backend
++    plan: free
++    env: docker
++    repo: https://github.com/fred1433/CounselAI.git
++    dockerContext: ./backend
++    dockerfilePath: ./backend/Dockerfile
++    healthCheckPath: /api/v1
++    envVars:
++      - key: DATABASE_URL
++        fromDatabase:
++          name: ad-insight-db
++          property: connectionString
++      - key: OPENAI_API_KEY
++        sync: false
++      - key: GEMINI_API_KEY
++        sync: false # Indique à Render que cette valeur est gérée dans le tableau de bord
++      - key: GEMINI_MODEL_NAME
++        value: gemini-2.5-pro
++      - key: FRONTEND_URL
++        value: https://counselai-frontend.onrender.com
++
++  # Frontend Service (Next.js)
++  - type: web
++    name: counselai-frontend
++    plan: free
++    env: docker
++    repo: https://github.com/fred1433/CounselAI.git
++    branch: master
++    autoDeploy: yes
++    dockerContext: ./frontend
++    dockerfilePath: ./frontend/Dockerfile
++    dockerBuildTarget: runner
++    envVars:
++      - key: NEXT_PUBLIC_API_URL
++        value: https://counselai-backend.onrender.com
++
++        
+\ No newline at end of file
+diff --git a/~/.ssh/config b/~/.ssh/config
+new file mode 100644
+index 0000000..787a153
+--- /dev/null
++++ b/~/.ssh/config
+@@ -0,0 +1,2 @@
++Host ssh.render.com
++  IdentityFile ~/.ssh/id_render 
+\ No newline at end of file

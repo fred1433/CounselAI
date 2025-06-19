@@ -25,6 +25,7 @@ export const contractSchema = z.object({
   includeNda: z.boolean().default(false),
   includeNonCompetition: z.boolean().default(false),
   attyInNotice: z.boolean().default(false),
+  attorneyName: z.string().optional(),
   prose: z.string().optional(),
 });
 
