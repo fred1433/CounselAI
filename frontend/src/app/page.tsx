@@ -31,6 +31,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { Loader2 } from 'lucide-react';
 import ContractEditor from '@/components/ContractEditor';
+import FileUploader from '@/components/FileUploader';
 
 // For development: initialize with mock data to bypass the form.
 const MOCK_CONTRACT_DATA = `# EMPLOYMENT AGREEMENT
@@ -228,6 +229,7 @@ export default function Home() {
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
 
   const form = useForm({
     resolver: zodResolver(contractSchema),
@@ -260,55 +262,67 @@ export default function Home() {
     },
   });
 
-  async function onSubmit(data: ContractFormData) {
-    setIsGeneratingContract(true);
-    setGeneratedContract('');
-    try {
-      const response = await axios.post('/api/v1/contracts/generate', data);
-      if (response.data && response.data.contract) {
-        setGeneratedContract(response.data.contract);
-      } else {
-        // Handle cases where the contract is not in the response
-        setGeneratedContract("Error: Could not generate contract.");
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      setGeneratedContract("Error: Failed to communicate with the server.");
-    } finally {
-      setIsGeneratingContract(false);
-    }
-  }
-
-  // Effect to manage WebSocket connection
   useEffect(() => {
-    // This effect runs only once when the component mounts
     const newSocket = io('http://localhost:3001');
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
+      console.log('Socket connected!');
     });
 
-    newSocket.on('contractUpdated', (newContract: string) => {
-      setGeneratedContract(newContract);
+    newSocket.on('contract_update', (data: { contract: string }) => {
+      setGeneratedContract(data.contract);
+    });
+
+    newSocket.on('generation_complete', (data: { contract: string }) => {
+      setGeneratedContract(data.contract);
+      setIsGeneratingContract(false);
+    });
+
+    newSocket.on('edit_error', (data: { error: string }) => {
+      console.error('Edit error:', data.error);
+      // TODO: Display this error to the user
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'The contract has been updated.' }]);
     });
 
-    newSocket.on('editError', (errorMessage: string) => {
-      setIsEditing(false);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: `Sorry, an error occurred: ${errorMessage}` }]);
+    newSocket.on('log', (data: { message: string, type?: string }) => {
+      console.log(`[SERVER LOG] ${data.type || 'info'}: ${data.message}`);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
-    });
-
-    // Cleanup function to disconnect the socket when the component unmounts
     return () => {
       newSocket.disconnect();
     };
-  }, []); // The empty dependency array ensures this runs only once
+  }, []);
+
+  async function onSubmit(data: ContractFormData) {
+    setIsGeneratingContract(true);
+    setGeneratedContract('');
+
+    const formData = new FormData();
+    formData.append('contractData', JSON.stringify(data));
+    
+    if (templateFile) {
+      formData.append('templateFile', templateFile);
+    }
+
+    try {
+      const response = await axios.post(
+        'http://localhost:3001/api/v1/contracts/generate',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      setGeneratedContract(response.data.contract);
+    } catch (error) {
+      console.error('Error generating contract:', error);
+      // TODO: show a toast or other error message to the user
+    } finally {
+      setIsGeneratingContract(false);
+    }
+  }
 
   // Effect to set the initial chat message when the contract is first generated
   useEffect(() => {
@@ -323,16 +337,15 @@ export default function Home() {
   }, [generatedContract]);
 
   const handleSendMessage = () => {
-    if (socket && chatInput.trim()) {
-      setIsEditing(true);
-      const payload = {
-        message: chatInput,
-        contract: generatedContract,
-      };
-      socket.emit('editRequest', payload);
-      setChatHistory(prev => [...prev, { role: 'user', content: chatInput }]);
-      setChatInput('');
-    }
+    if (!chatInput.trim() || !socket) return;
+    setIsEditing(true);
+    const payload = {
+      message: chatInput,
+      contract: generatedContract,
+    };
+    socket.emit('editRequest', payload);
+    setChatHistory(prev => [...prev, { role: 'user', content: chatInput }]);
+    setChatInput('');
   };
   
   const handleExportPDF = () => {
@@ -438,6 +451,12 @@ export default function Home() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Template (Optional)</h3>
+                <FileUploader onFileSelect={setTemplateFile} />
+              </div>
+
               {/* Section: Parties */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Parties</h3>
@@ -471,9 +490,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Section: Position */}
+              {/* Section: Job Details */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Position</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">Job Details</h3>
                 <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
@@ -518,9 +537,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Section: Terms */}
+              {/* Section: Employment Term */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Contract Terms</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">Employment Term</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -587,9 +606,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Section: Conditions */}
+              {/* Section: Work Location and Schedule */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Conditions</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">Work Location and Schedule</h3>
                 <FormField
                   control={form.control}
                   name="onSitePresence"
@@ -603,6 +622,11 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              {/* Section: Compensation */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Compensation</h3>
                 <FormField
                   control={form.control}
                   name="salary"
@@ -712,9 +736,9 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-        </div>
+              </div>
 
-              {/* Section: Prose */}
+              {/* Section: Other Specifics */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Other Specifics</h3>
                 <FormField
@@ -765,9 +789,8 @@ export default function Home() {
   );
 
   const renderEditor = () => (
-    <div className="flex w-full space-x-8 items-start">
-      {/* Left side: Document */}
-      <div className="flex-1">
+    <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="md:col-span-2">
         <Card className="h-full relative max-h-[calc(100vh-6rem)] flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contract Draft</CardTitle>
@@ -793,8 +816,7 @@ export default function Home() {
           )}
         </Card>
       </div>
-      {/* Right side: Chat */}
-      <div className="w-1/3 sticky top-8">
+      <div className="sticky top-8 md:col-span-1">
         <Card className="flex flex-col max-h-[calc(100vh-6rem)]">
           <CardHeader>
             <CardTitle>Ask for changes</CardTitle>
