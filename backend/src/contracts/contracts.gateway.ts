@@ -3,10 +3,8 @@ import {
   SubscribeMessage,
   MessageBody,
   WebSocketServer,
-  ConnectedSocket,
 } from '@nestjs/websockets';
-import { Inject, forwardRef } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { ContractsService } from './contracts.service';
 
 interface EditPayload {
@@ -24,10 +22,7 @@ export class ContractsGateway {
   @WebSocketServer()
   server: Server;
 
-  constructor(
-    @Inject(forwardRef(() => ContractsService))
-    private readonly contractsService: ContractsService,
-  ) {}
+  constructor(private readonly contractsService: ContractsService) {}
 
   @SubscribeMessage('editContract')
   async handleMessage(@MessageBody() data: EditPayload): Promise<void> {

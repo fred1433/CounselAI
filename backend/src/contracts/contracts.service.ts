@@ -1,9 +1,14 @@
-import { Injectable, Inject, InternalServerErrorException, forwardRef, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  InternalServerErrorException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { GenerateContractDto } from './dto/generate-contract.dto';
 import { GenerateDescriptionDto } from './dto/generate-description.dto';
-import { ContractsGateway } from './contracts.gateway';
 import * as mammoth from 'mammoth';
 import * as pdfParse from 'pdf-parse';
 import { Express } from 'express';
@@ -13,14 +18,16 @@ import { plainToClass } from 'class-transformer';
 @Injectable()
 export class ContractsService {
   private readonly geminiPro: GenerativeModel;
+  private readonly logger = new Logger(ContractsService.name);
 
   constructor(
     private readonly configService: ConfigService,
     @Inject('GEMINI_API_KEY') private readonly gemini_api_key: string,
-    @Inject(forwardRef(() => ContractsGateway))
-    private readonly contractsGateway: ContractsGateway,
   ) {
-    const modelName = this.configService.get<string>('GEMINI_MODEL_NAME', 'gemini-1.5-flash');
+    const modelName = this.configService.get<string>(
+      'GEMINI_MODEL_NAME',
+      'gemini-1.5-flash',
+    );
     const genAI = new GoogleGenerativeAI(this.gemini_api_key);
     this.geminiPro = genAI.getGenerativeModel({ model: modelName });
   }
@@ -34,9 +41,9 @@ export class ContractsService {
   private async extractTextFromFile(
     file: Express.Multer.File,
   ): Promise<string> {
-    this.contractsGateway.server.emit('log', {
-      message: `Extracting text from file: ${file.originalname} (${file.mimetype})`,
-    });
+    this.logger.log(
+      `Extracting text from file: ${file.originalname} (${file.mimetype})`,
+    );
 
     try {
       if (file.mimetype === 'application/pdf') {
@@ -59,10 +66,7 @@ export class ContractsService {
         throw new InternalServerErrorException('Unsupported file type');
       }
     } catch (error) {
-      this.contractsGateway.server.emit('log', {
-        message: `Error extracting text from file: ${error.message}`,
-        type: 'error',
-      });
+      this.logger.error(`Error extracting text from file: ${error.message}`);
       throw new InternalServerErrorException(
         'Failed to extract text from file.',
       );
@@ -97,42 +101,27 @@ export class ContractsService {
 
     let prompt = '';
     if (templateFile) {
-      this.contractsGateway.server.emit('log', {
-        message: 'Template file detected, starting text extraction.',
-      });
+      this.logger.log('Template file detected, starting text extraction.');
       const userTemplate = await this.extractTextFromFile(templateFile);
-      this.contractsGateway.server.emit('log', {
-        message: 'Text extraction successful.',
-      });
+      this.logger.log('Text extraction successful.');
       prompt = this.buildPromptFromTemplate(contractDto, userTemplate);
     } else {
-        this.contractsGateway.server.emit('log', {
-        message: 'Constructing prompt from scratch (no template provided).',
-      });
+        this.logger.log('Constructing prompt from scratch (no template provided).');
       prompt = this.buildPromptFromData(contractDto);
     }
 
     try {
-      this.contractsGateway.server.emit('log', {
-        message: 'Sending prompt to Gemini API...',
-      });
+      this.logger.log('Sending prompt to Gemini API...');
       const result = await this.geminiPro.generateContent(prompt);
       const response = result.response;
       const text = response.text();
       const cleanedText = this.cleanLLMResponse(text);
       
-      this.contractsGateway.server.emit('log', {
-        message: 'Contract generation successful.',
-      });
-      this.contractsGateway.server.emit('generation_complete', { contract: cleanedText });
-
+      this.logger.log('Contract generation successful.');
+      
       return cleanedText;
     } catch (error) {
-      console.error('Error generating contract with Gemini:', error);
-      this.contractsGateway.server.emit('log', {
-        message: `An error occurred during contract generation: ${error.message}`,
-        type: 'error',
-      });
+      this.logger.error('Error generating contract with Gemini:', error);
       if (error instanceof Error) {
         throw new InternalServerErrorException(
           `Gemini API Error: ${error.message}`,
@@ -147,20 +136,19 @@ export class ContractsService {
     instruction: string,
     requestId: string,
   ): Promise<{ contract: string }> {
-    this.contractsGateway.server.emit('log', {
-      message: `[SERVICE] Editing contract for ID ${requestId} with instruction: ${instruction}`,
-    });
+    this.logger.log(
+      `[SERVICE] Editing contract for ID ${requestId} with instruction: ${instruction}`,
+    );
     const prompt = this.buildEditPrompt(currentContract, instruction);
     try {
-      console.log(`[SERVICE] Calling Gemini for ID: ${requestId}`);
+      this.logger.log(`[SERVICE] Calling Gemini for ID: ${requestId}`);
       const result = await this.geminiPro.generateContent(prompt);
       const response = await result.response;
       const cleanedText = this.cleanLLMResponse(response.text());
-      console.log(`[SERVICE] Gemini response received for ID: ${requestId}`);
+      this.logger.log(`[SERVICE] Gemini response received for ID: ${requestId}`);
       return { contract: cleanedText };
     } catch (error) {
-      console.error(`[SERVICE] Error calling Gemini for editing on ID ${requestId}:`, error);
-      this.contractsGateway.server.emit('edit_error', { error: error.message, requestId: requestId });
+      this.logger.error(`[SERVICE] Error calling Gemini for editing on ID ${requestId}:`, error);
       throw new InternalServerErrorException(
         'Failed to edit contract via Gemini API.',
       );

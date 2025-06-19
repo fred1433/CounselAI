@@ -37,10 +37,12 @@ export class ContractsController {
     )
     templateFile?: Express.Multer.File,
   ) {
+    this.contractsGateway.server.emit('log', { message: 'Received request to generate contract.' });
     const generatedText = await this.contractsService.generateContract(
       contractData,
       templateFile,
     );
+    this.contractsGateway.server.emit('generation_complete', { contract: generatedText });
     return { contract: generatedText };
   }
 
