@@ -12,6 +12,7 @@ import { ContractsService } from './contracts.service';
 interface EditPayload {
   contract: string;
   message: string;
+  requestId: string;
 }
 
 @WebSocketGateway({
@@ -30,14 +31,16 @@ export class ContractsGateway {
 
   @SubscribeMessage('editContract')
   async handleMessage(@MessageBody() data: EditPayload): Promise<void> {
+    console.log(`[GATEWAY] Received editContract event with ID: ${data.requestId}`);
     try {
       const { contract: newContract } = await this.contractsService.editContract(
         data.contract,
         data.message,
+        data.requestId,
       );
 
       // Log the raw response from the LLM
-      console.log('Raw LLM Response:', JSON.stringify(newContract, null, 2));
+      console.log(`[GATEWAY] Raw LLM Response for ID ${data.requestId}:`, JSON.stringify(newContract, null, 2));
 
       // Sanitize the LLM response to remove markdown code blocks
       let sanitizedContract = newContract;
@@ -48,11 +51,12 @@ export class ContractsGateway {
         sanitizedContract = match[1];
       }
 
-      this.server.emit('contract_update', { contract: sanitizedContract });
+      console.log(`[GATEWAY] Emitting contract_update for ID: ${data.requestId}`);
+      this.server.emit('contract_update', { contract: sanitizedContract, requestId: data.requestId });
     } catch (error) {
-      console.error('Error during contract editing:', error);
+      console.error(`[GATEWAY] Error during contract editing for ID ${data.requestId}:`, error);
       // Optionally, emit an error event to the client
-      this.server.emit('edit_error', { error: 'Failed to update the contract.' });
+      this.server.emit('edit_error', { error: 'Failed to update the contract.', requestId: data.requestId });
     }
   }
 } 

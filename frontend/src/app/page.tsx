@@ -263,36 +263,81 @@ export default function Home() {
   });
 
   useEffect(() => {
+    // This effect establishes the socket connection.
     const newSocket = io('http://localhost:3001');
     setSocket(newSocket);
+    console.log('Socket instance created.');
 
-    newSocket.on('connect', () => {
-      console.log('Socket connected!');
-    });
-
-    newSocket.on('contract_update', (data: { contract: string }) => {
-      setGeneratedContract(data.contract);
-    });
-
-    newSocket.on('generation_complete', (data: { contract: string }) => {
-      setGeneratedContract(data.contract);
-      setIsGeneratingContract(false);
-    });
-
-    newSocket.on('edit_error', (data: { error: string }) => {
-      console.error('Edit error:', data.error);
-      // TODO: Display this error to the user
-      setIsEditing(false);
-    });
-
-    newSocket.on('log', (data: { message: string, type?: string }) => {
-      console.log(`[SERVER LOG] ${data.type || 'info'}: ${data.message}`);
-    });
-
+    // Cleanup function to disconnect the socket when the component unmounts.
+    // This is crucial for React's StrictMode to prevent duplicate connections.
     return () => {
+      console.log('Cleaning up and disconnecting socket.');
       newSocket.disconnect();
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only on mount and unmount.
+
+  useEffect(() => {
+    // This effect is responsible for handling socket event listeners.
+    // It runs whenever the `socket` instance is created or changes.
+    if (!socket) {
+      return;
+    }
+
+    const onConnect = () => {
+      console.log('Socket connected!');
+    };
+
+    const onContractUpdate = (data: {
+      contract: string;
+      requestId: string;
+    }) => {
+      console.log(
+        `[FRONTEND] Received contract_update with ID: ${data.requestId}`,
+        data,
+      );
+      setGeneratedContract(data.contract);
+      setIsEditing(false);
+      setChatHistory(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'The contract has been updated based on your request.',
+        },
+      ]);
+    };
+
+    const onGenerationComplete = (data: { contract: string }) => {
+      setGeneratedContract(data.contract);
+      setIsGeneratingContract(false);
+    };
+
+    const onEditError = (data: { error: string; requestId?: string }) => {
+      console.error(`Edit error for request ID ${data.requestId}:`, data.error);
+      setIsEditing(false);
+    };
+
+    const onLog = (data: { message: string; type?: string }) => {
+      console.log(`[SERVER LOG] ${data.type || 'info'}: ${data.message}`);
+    };
+
+    console.log('Attaching socket listeners.');
+    socket.on('connect', onConnect);
+    socket.on('contract_update', onContractUpdate);
+    socket.on('generation_complete', onGenerationComplete);
+    socket.on('edit_error', onEditError);
+    socket.on('log', onLog);
+
+    // Cleanup function to remove listeners when the component unmounts
+    // or before the effect re-runs for a new socket instance.
+    return () => {
+      console.log('Detaching socket listeners.');
+      socket.off('connect', onConnect);
+      socket.off('contract_update', onContractUpdate);
+      socket.off('generation_complete', onGenerationComplete);
+      socket.off('edit_error', onEditError);
+      socket.off('log', onLog);
+    };
+  }, [socket]); // This effect re-runs if the socket object changes.
 
   async function onSubmit(data: ContractFormData) {
     setIsGeneratingContract(true);
@@ -329,7 +374,7 @@ export default function Home() {
     if (generatedContract && chatHistory.length === 0) {
       setChatHistory([{
         role: 'assistant',
-        content: "I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: 'Increase the salary to $98,000' or 'Add a clause for a company car.'"
+        content: "I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: 'Change the salary to $98,000' or 'Add a clause for a company car.'"
       }]);
     }
     // This effect depends on generatedContract, but not on chatHistory to avoid loops
@@ -338,12 +383,17 @@ export default function Home() {
 
   const handleSendMessage = () => {
     if (!chatInput.trim() || !socket) return;
+    
+    const requestId = `req-${Date.now()}`;
+    console.log(`[FRONTEND] Sending editContract with ID: ${requestId}`);
+
     setIsEditing(true);
     const payload = {
       message: chatInput,
       contract: generatedContract,
+      requestId: requestId,
     };
-    socket.emit('editRequest', payload);
+    socket.emit('editContract', payload);
     setChatHistory(prev => [...prev, { role: 'user', content: chatInput }]);
     setChatInput('');
   };
@@ -837,30 +887,26 @@ export default function Home() {
                   </div>
                 </div>
               ))}
-            </div>
+        </div>
           </CardContent>
           <CardFooter>
-              <div className="w-full flex space-x-2">
-                  <Textarea 
-                    placeholder="Ex: Change salary to $160,000." 
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                  />
-                  <Button onClick={handleSendMessage} disabled={isEditing}>
-                    {isEditing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Editing...
-                      </>
-                    ) : 'Send'}
-                  </Button>
-              </div>
+            <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2 w-full">
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ex: Change salary to $160,000."
+                className="flex-1"
+                disabled={isEditing}
+              />
+              <Button type="submit" className="w-auto" disabled={isEditing}>
+                {isEditing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Editing...
+                  </>
+                ) : 'Send'}
+              </Button>
+            </form>
           </CardFooter>
         </Card>
       </div>

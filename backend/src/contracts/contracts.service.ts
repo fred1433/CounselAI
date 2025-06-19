@@ -145,22 +145,22 @@ export class ContractsService {
   async editContract(
     currentContract: string,
     instruction: string,
+    requestId: string,
   ): Promise<{ contract: string }> {
     this.contractsGateway.server.emit('log', {
-      message: 'Editing contract with instruction: ' + instruction,
+      message: `[SERVICE] Editing contract for ID ${requestId} with instruction: ${instruction}`,
     });
     const prompt = this.buildEditPrompt(currentContract, instruction);
     try {
+      console.log(`[SERVICE] Calling Gemini for ID: ${requestId}`);
       const result = await this.geminiPro.generateContent(prompt);
       const response = await result.response;
       const cleanedText = this.cleanLLMResponse(response.text());
-      this.contractsGateway.server.emit('contract_update', {
-        contract: cleanedText,
-      });
+      console.log(`[SERVICE] Gemini response received for ID: ${requestId}`);
       return { contract: cleanedText };
     } catch (error) {
-      console.error('Error calling Gemini API for editing:', error);
-      this.contractsGateway.server.emit('edit_error', { error: error.message });
+      console.error(`[SERVICE] Error calling Gemini for editing on ID ${requestId}:`, error);
+      this.contractsGateway.server.emit('edit_error', { error: error.message, requestId: requestId });
       throw new InternalServerErrorException(
         'Failed to edit contract via Gemini API.',
       );
