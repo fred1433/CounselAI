@@ -235,11 +235,11 @@ export default function Home() {
   const form = useForm({
     resolver: zodResolver(contractSchema),
     defaultValues: {
-      employerName: "Innovatech Solutions",
-      employeeName: "Alice Dubois",
-      jobTitle: "Senior Software Engineer",
+      employerName: "",
+      employeeName: "",
+      jobTitle: "",
       jobDescription: "",
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: "",
       hasInitialTerm: false,
       hasNoEndDate: false,
       onSitePresence: "",
