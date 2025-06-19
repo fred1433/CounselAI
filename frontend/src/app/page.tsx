@@ -844,26 +844,12 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex items-center justify-center space-x-4 pt-4">
-                <Button type="submit" disabled={isGeneratingContract}>
-                  {isGeneratingContract ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating Draft...
-                    </>
-                  ) : (
-                    'Generate Draft'
-                  )}
+              {/* Action Buttons */}
+              <div className="flex justify-center items-center mt-6">
+                <Button type="submit" size="lg" disabled={isGeneratingContract}>
+                  {isGeneratingContract && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Generate Draft
                 </Button>
-                {process.env.NODE_ENV === 'development' && (
-                  <Button
-                    variant="link"
-                    type="button"
-                    onClick={() => setGeneratedContract(MOCK_CONTRACT_DATA)}
-                  >
-                    (DEV) Bypass Form
-                  </Button>
-                )}
               </div>
             </form>
           </Form>
