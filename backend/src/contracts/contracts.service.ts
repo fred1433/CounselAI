@@ -38,9 +38,25 @@ export class ContractsService {
   }
 
   private cleanLLMResponse(response: string): string {
-    const markdownCodeBlockRegex = /```(markdown)?\s*([\s\S]*?)\s*```/g;
-    const cleanedResponse = response.replace(markdownCodeBlockRegex, '$2');
-    return cleanedResponse.trim();
+    let cleanedText = response;
+
+    // 1. Remove markdown code blocks if they exist
+    cleanedText = cleanedText.replace(/```(markdown)?\s*([\s\S]*?)\s*```/g, '$2');
+
+    // 2. Remove any disclaimers or attorney's notes, often wrapped in ***
+    const disclaimerRegex =
+      /\*{3,}[\s\S]*?(DISCLAIMER|NOTE|ATTORNEY'S NOTE)[\s\S]*?\*{3,}/gim;
+    cleanedText = cleanedText.replace(disclaimerRegex, '');
+
+    // 3. Remove any conversational preamble before the main contract title
+    // This finds the first real markdown heading and takes everything from there onwards.
+    const firstHeadingIndex = cleanedText.search(/^#+\s/m);
+    if (firstHeadingIndex > -1) {
+      cleanedText = cleanedText.substring(firstHeadingIndex);
+    }
+
+    // 4. Final trim
+    return cleanedText.trim();
   }
 
   private async extractTextFromFile(
@@ -179,7 +195,8 @@ export class ContractsService {
       1.  **Analyze the ENTIRE history** to understand the evolution of the contract.
       2.  The "assistant" or "Lawyer (You)" messages contain the full contract text at that point in the conversation. Use the LAST assistant message as the base for the new edit.
       3.  The LAST message in the history is from the "user" (the client) and contains the instruction you must apply now.
-      4.  Your response MUST be only the complete and updated contract text in Markdown format. Do not include any commentary, greetings, or other conversational text.
+      4.  Your response must begin DIRECTLY with the contract text (e.g., starting with "### EMPLOYMENT AGREEMENT"). Do not include any preamble, greetings, or conversational filler.
+      5.  ABSOLUTELY DO NOT include any kind of disclaimer, warning, or note suggesting this is a template. The output must be a clean, final document.
 
       ---
       **Conversation History:**
@@ -198,9 +215,17 @@ export class ContractsService {
       .join('\n');
     
     return `
-      Act as an expert US-based lawyer. Draft a formal and professional employment agreement based on the following details.
-      The tone should be legal, clear, and compliant with standard US employment law.
-      The output should be in Markdown format.
+      As an expert lawyer, generate a professional, legally-sound employment contract based on the following details.
+
+      **CRITICAL INSTRUCTIONS:**
+      1.  The output MUST be a complete contract in clean, well-formatted Markdown.
+      2.  The tone must be formal and authoritative.
+      3.  Where information is missing (e.g., company address), use a clear placeholder like [Insert Company Address].
+      4.  Your response must begin DIRECTLY with the contract text (e.g., starting with "### EMPLOYMENT AGREEMENT"). Do not include any preamble, greetings, or conversational filler like "Of course, here is the contract...".
+      5.  ABSOLUTELY DO NOT include any kind of disclaimer, warning, or note suggesting this is a template or that a lawyer should be consulted. The output must be a clean, final document ready for signature.
+
+      ---
+      **CONTRACT DETAILS:**
 
       **Parties:**
       - Employer: ${data.employerName}
@@ -256,28 +281,24 @@ export class ContractsService {
       .join('\\n');
 
     return `
-        Act as an expert US-based lawyer. Your task is to generate a final employment agreement.
+      As an expert lawyer, your task is to take a user-provided contract template and fill in the specific details provided.
 
-        You will be given a raw text template extracted from a document and a list of specific details. Your job is to intelligently integrate the details into the template's structure to create a clean, final contract.
-        
-        **CRITICAL INSTRUCTIONS:**
-        1.  **CLEAN THE TEMPLATE:** The provided template text may contain artifacts from its original format, such as "Page 1", "Employee's Initials: ____", headers, or footers. You MUST identify and completely remove these artifacts from the final output. The final document should look like a clean contract, not a scanned page.
-        2.  **INTEGRATE DATA:** Fill in the placeholders or relevant sections of the template (e.g., [EMPLOYER_NAME], [JOB_TITLE], [SALARY]) with the corresponding details from the 'Data to Integrate' section.
-        3.  **FINAL FORMATTING:** The final output MUST be a single, coherent document formatted in clean, well-structured Markdown. Use headings (#, ##), bolding (**), and lists (-) appropriately to ensure high readability. Do not wrap the output in a code block.
+      **CRITICAL INSTRUCTIONS:**
+      1.  Carefully review the entire provided template.
+      2.  Populate the template with the details below, replacing all placeholders seamlessly and accurately.
+      3.  Your response must begin DIRECTLY with the populated contract text. Do not include any preamble, greetings, or conversational filler.
+      4.  ABSOLUTELY DO NOT add any disclaimers, warnings, or notes. The document should look like a final version, not a draft.
 
-        ---
-        **Data to Integrate:**
-        ---
-        ${dataAsText}
-        ---
+      ---
+      **DETAILS TO INTEGRATE:**
+      ---
+      ${dataAsText}
+      ---
+      **USER-PROVIDED TEMPLATE:**
+      ${template}
+      ---
 
-        ---
-        **Raw Text Template (to be cleaned and completed):**
-        ---
-        ${template}
-        ---
-
-        Now, generate the final, clean, and well-formatted Markdown contract based on all the instructions above.
+      Now, generate the final, clean, and well-formatted Markdown contract based on all the instructions above.
     `;
   }
 
