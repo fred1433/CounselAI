@@ -29,7 +29,7 @@ import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown } from 'lucide-react';
 import ContractEditor from '@/components/ContractEditor';
 import FileUploader from '@/components/FileUploader';
 
@@ -230,6 +230,7 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [isUploaderVisible, setIsUploaderVisible] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(contractSchema),
@@ -506,8 +507,20 @@ export default function Home() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Template (Optional)</h3>
-                <FileUploader onFileSelect={setTemplateFile} />
+                <div 
+                  className="flex justify-between items-center cursor-pointer border-b pb-2"
+                  onClick={() => setIsUploaderVisible(!isUploaderVisible)}
+                  role="button"
+                  aria-expanded={isUploaderVisible}
+                >
+                  <h3 className="text-lg font-semibold">Upload your own template (Optional)</h3>
+                  <ChevronDown 
+                    className={`h-5 w-5 transition-transform duration-200 ${isUploaderVisible ? 'rotate-180' : ''}`} 
+                  />
+                </div>
+                {isUploaderVisible && (
+                  <FileUploader onFileSelect={setTemplateFile} />
+                )}
               </div>
 
               {/* Section: Parties */}
@@ -789,7 +802,7 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-              </div>
+        </div>
 
               {/* Section: Other Specifics */}
               <div className="space-y-4">

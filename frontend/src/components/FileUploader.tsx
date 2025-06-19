@@ -52,10 +52,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelect }) => {
   };
 
   return (
-    <div className="file-uploader-container mb-4">
-      <h3 className="text-lg font-semibold mb-2">
-        Upload a Template (Optional)
-      </h3>
+    <div className="file-uploader-container">
       <div
         {...getRootProps()}
         className={`p-6 border-2 border-dashed rounded-md text-center cursor-pointer transition-colors ${

@@ -116,12 +116,12 @@ AND
 11.1. Any notice or other communication required or permitted hereunder shall be in writing and shall be deemed to have been duly given when delivered personally, sent by certified or registered mail, return receipt requested, postage prepaid, or by a reputable overnight courier service, to the parties at the following addresses or such other addresses as either party may designate by written notice to the other:
 
     **If to the Company:**
-    QuantumLeap AI
+QuantumLeap AI
     [Insert Company Address]
     Attention: [Insert Company Attorney Name/Department]
 
     **If to the Employee:**
-    Dr. Evelyn Reed
+Dr. Evelyn Reed
     [Insert Employee Address]
 
 ---
