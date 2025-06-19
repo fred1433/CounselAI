@@ -292,12 +292,12 @@ export default function Home() {
     newSocket.on('contractUpdated', (newContract: string) => {
       setGeneratedContract(newContract);
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Parfait, le contrat a été mis à jour.' }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'The contract has been updated.' }]);
     });
 
     newSocket.on('editError', (errorMessage: string) => {
       setIsEditing(false);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: `Désolé, une erreur est survenue: ${errorMessage}` }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: `Sorry, an error occurred: ${errorMessage}` }]);
     });
 
     newSocket.on('disconnect', () => {
@@ -315,7 +315,7 @@ export default function Home() {
     if (generatedContract && chatHistory.length === 0) {
       setChatHistory([{
         role: 'assistant',
-        content: "J'ai généré une ébauche du contrat. N'hésitez pas à la relire et à me demander des modifications. Par exemple : 'Augmente le salaire à 98 000€' ou 'Ajoute une clause pour une voiture de fonction.'"
+        content: "I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: 'Increase the salary to $98,000' or 'Add a clause for a company car.'"
       }]);
     }
     // This effect depends on generatedContract, but not on chatHistory to avoid loops
