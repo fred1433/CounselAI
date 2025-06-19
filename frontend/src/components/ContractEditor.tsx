@@ -28,6 +28,7 @@ const ContractEditor = ({ content, onChange, isEditing }: ContractEditorProps) =
     onUpdate: ({ editor }) => {
       onChange(editor.storage.markdown.getMarkdown());
     },
+    immediatelyRender: false,
   });
 
   useEffect(() => {
