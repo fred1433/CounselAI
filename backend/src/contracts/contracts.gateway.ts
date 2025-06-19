@@ -5,6 +5,7 @@ import {
   WebSocketServer,
   ConnectedSocket,
 } from '@nestjs/websockets';
+import { Inject, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ContractsService } from './contracts.service';
 
@@ -22,9 +23,12 @@ export class ContractsGateway {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly contractsService: ContractsService) {}
+  constructor(
+    @Inject(forwardRef(() => ContractsService))
+    private readonly contractsService: ContractsService,
+  ) {}
 
-  @SubscribeMessage('editRequest')
+  @SubscribeMessage('editContract')
   async handleMessage(@MessageBody() data: EditPayload): Promise<void> {
     try {
       const { contract: newContract } = await this.contractsService.editContract(
@@ -44,11 +48,11 @@ export class ContractsGateway {
         sanitizedContract = match[1];
       }
 
-      this.server.emit('contractUpdated', sanitizedContract);
+      this.server.emit('contract_update', { contract: sanitizedContract });
     } catch (error) {
       console.error('Error during contract editing:', error);
       // Optionally, emit an error event to the client
-      this.server.emit('editError', 'Failed to update the contract.');
+      this.server.emit('edit_error', { error: 'Failed to update the contract.' });
     }
   }
 } 

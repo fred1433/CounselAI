@@ -1,61 +1,176 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Inject, InternalServerErrorException, forwardRef, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { GenerateContractDto } from './dto/generate-contract.dto';
 import { GenerateDescriptionDto } from './dto/generate-description.dto';
+import { ContractsGateway } from './contracts.gateway';
+import * as mammoth from 'mammoth';
+import * as pdfParse from 'pdf-parse';
+import { Express } from 'express';
+import { validate } from 'class-validator';
+import { plainToClass } from 'class-transformer';
 
 @Injectable()
 export class ContractsService {
-  private genAI: GoogleGenerativeAI;
-  private modelName: string;
+  private readonly geminiPro: GenerativeModel;
 
-  constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set in the environment variables.');
-    }
-    this.genAI = new GoogleGenerativeAI(apiKey);
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject('GEMINI_API_KEY') private readonly gemini_api_key: string,
+    @Inject(forwardRef(() => ContractsGateway))
+    private readonly contractsGateway: ContractsGateway,
+  ) {
+    const modelName = this.configService.get<string>('GEMINI_MODEL_NAME', 'gemini-1.5-flash');
+    const genAI = new GoogleGenerativeAI(this.gemini_api_key);
+    this.geminiPro = genAI.getGenerativeModel({ model: modelName });
+  }
 
-    const modelName = this.configService.get<string>('GEMINI_MODEL_NAME');
-    if (!modelName) {
-      throw new Error('GEMINI_MODEL_NAME is not set in the environment variables.');
+  private cleanLLMResponse(response: string): string {
+    const markdownCodeBlockRegex = /```(markdown)?\s*([\s\S]*?)\s*```/g;
+    const cleanedResponse = response.replace(markdownCodeBlockRegex, '$2');
+    return cleanedResponse.trim();
+  }
+
+  private async extractTextFromFile(
+    file: Express.Multer.File,
+  ): Promise<string> {
+    this.contractsGateway.server.emit('log', {
+      message: `Extracting text from file: ${file.originalname} (${file.mimetype})`,
+    });
+
+    try {
+      if (file.mimetype === 'application/pdf') {
+        const data = await pdfParse(file.buffer);
+        return data.text;
+      } else if (
+        file.mimetype ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ) {
+        const { value } = await mammoth.extractRawText({
+          buffer: file.buffer,
+        });
+        return value;
+      } else if (
+        file.mimetype === 'text/plain' ||
+        file.mimetype === 'text/markdown'
+      ) {
+        return file.buffer.toString('utf-8');
+      } else {
+        throw new InternalServerErrorException('Unsupported file type');
+      }
+    } catch (error) {
+      this.contractsGateway.server.emit('log', {
+        message: `Error extracting text from file: ${error.message}`,
+        type: 'error',
+      });
+      throw new InternalServerErrorException(
+        'Failed to extract text from file.',
+      );
     }
-    this.modelName = modelName;
   }
 
   async generateContract(
-    contractData: GenerateContractDto,
+    contractData: string, // Accept string to manually parse and validate
+    templateFile?: Express.Multer.File,
   ): Promise<string> {
-    const model = this.genAI.getGenerativeModel({ model: this.modelName });
+    let contractDto: GenerateContractDto;
+    try {
+      const parsedData = JSON.parse(contractData);
+      contractDto = plainToClass(GenerateContractDto, parsedData);
+    } catch (error) {
+      throw new BadRequestException('Invalid JSON format for contractData');
+    }
 
-    const prompt = this.buildPrompt(contractData);
+    const errors = await validate(contractDto);
+
+    if (errors.length > 0) {
+      // Format errors to be more readable
+      const formattedErrors = errors.map(err => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    let prompt = '';
+    if (templateFile) {
+      this.contractsGateway.server.emit('log', {
+        message: 'Template file detected, starting text extraction.',
+      });
+      const userTemplate = await this.extractTextFromFile(templateFile);
+      this.contractsGateway.server.emit('log', {
+        message: 'Text extraction successful.',
+      });
+      prompt = this.buildPromptFromTemplate(contractDto, userTemplate);
+    } else {
+        this.contractsGateway.server.emit('log', {
+        message: 'Constructing prompt from scratch (no template provided).',
+      });
+      prompt = this.buildPromptFromData(contractDto);
+    }
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
+      this.contractsGateway.server.emit('log', {
+        message: 'Sending prompt to Gemini API...',
+      });
+      const result = await this.geminiPro.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
+      const cleanedText = this.cleanLLMResponse(text);
+      
+      this.contractsGateway.server.emit('log', {
+        message: 'Contract generation successful.',
+      });
+      this.contractsGateway.server.emit('generation_complete', { contract: cleanedText });
+
+      return cleanedText;
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      // TODO: Gérer les erreurs de manière plus robuste
-      throw new Error('Failed to generate contract from Gemini API.');
+      console.error('Error generating contract with Gemini:', error);
+      this.contractsGateway.server.emit('log', {
+        message: `An error occurred during contract generation: ${error.message}`,
+        type: 'error',
+      });
+      if (error instanceof Error) {
+        throw new InternalServerErrorException(
+          `Gemini API Error: ${error.message}`,
+        );
+      }
+      throw new InternalServerErrorException('Failed to generate contract.');
     }
   }
 
-  async editContract(currentContract: string, instruction: string): Promise<{ contract: string }> {
+  async editContract(
+    currentContract: string,
+    instruction: string,
+  ): Promise<{ contract: string }> {
+    this.contractsGateway.server.emit('log', {
+      message: 'Editing contract with instruction: ' + instruction,
+    });
     const prompt = this.buildEditPrompt(currentContract, instruction);
     try {
-      const model = this.genAI.getGenerativeModel({ model: this.modelName });
-      const result = await model.generateContent(prompt);
+      const result = await this.geminiPro.generateContent(prompt);
       const response = await result.response;
-      const newContract = response.text();
-      return { contract: newContract };
+      const cleanedText = this.cleanLLMResponse(response.text());
+      this.contractsGateway.server.emit('contract_update', {
+        contract: cleanedText,
+      });
+      return { contract: cleanedText };
     } catch (error) {
-      console.error('Error editing contract with Gemini:', error);
-      throw new InternalServerErrorException('Failed to edit contract.');
+      console.error('Error calling Gemini API for editing:', error);
+      this.contractsGateway.server.emit('edit_error', { error: error.message });
+      throw new InternalServerErrorException(
+        'Failed to edit contract via Gemini API.',
+      );
     }
   }
 
-  private buildEditPrompt(contract: string, instruction: string): string {
+  private buildEditPrompt(
+    currentContract: string,
+    instruction: string,
+  ): string {
     return `
       Act as an expert US-based lawyer editing a document.
       You will be given an existing employment agreement and an instruction for a change.
@@ -67,17 +182,19 @@ export class ContractsService {
 
       ---
 
-      **Existing Contract:**
-      \`\`\`markdown
-      ${contract}
-      \`\`\`
+      **Current Contract Text:**
+      ---
+      ${currentContract}
+      ---
+
+      Apply the instruction to the contract now.
     `;
   }
 
-  private buildPrompt(data: GenerateContractDto): string {
+  private buildPromptFromData(data: GenerateContractDto): string {
     const benefitsList = Object.entries(data.benefits)
       .filter(([, value]) => value)
-      .map(([key]) => `- ${key.replace(/([A-Z])/g, ' $1').trim()}`) // Format a readable name
+      .map(([key]) => `- ${key.replace(/([A-Z])/g, ' $1').trim()}`)
       .join('\n');
     
     return `
@@ -119,47 +236,68 @@ export class ContractsService {
     `;
   }
 
-  async generateDescription(data: GenerateDescriptionDto): Promise<string> {
-    if (!process.env.GEMINI_API_KEY) {
-      console.error('GEMINI_API_KEY is not configured in .env file.');
-      throw new Error('AI service is not configured.');
-    }
+  private buildPromptFromTemplate(data: GenerateContractDto, template: string): string {
+    const dataAsText = Object.entries(data)
+      .map(([key, value]) => {
+        if (key === 'benefits' && typeof value === 'object' && value !== null) {
+          const benefits = Object.entries(value)
+            .filter(([, v]) => v)
+            .map(([k]) => k.replace(/([A-Z])/g, ' $1').trim())
+            .join(', ');
+          return `Benefits: ${benefits}`;
+        }
+        if (typeof value !== 'object') {
+            return `${key}: ${value}`;
+        }
+        return '';
+      })
+      .filter(line => line)
+      .join('\n');
 
-    try {
-      const { jobTitle, companyName, companyBusiness } = data;
+    return `
+        You are an expert legal assistant. Your task is to complete a contract template with the provided information.
+        Fill in the placeholders within the template (like [EMPLOYER_NAME], [JOB_TITLE], [SALARY], etc.) with the corresponding details from the 'Information to Fill In' section.
+        If the template is more generic, use the provided data to complete it as logically as possible.
+        Do not invent new clauses or significantly modify the structure of the template.
+        Output ONLY the completed contract text in Markdown format.
 
-      const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-1.5-flash';
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: modelName });
+        **Contract Template to Complete:**
+        ---
+        ${template}
+        ---
 
-      const prompt = `
-        Act as a meticulous HR specialist drafting the "Scope of Duties" section for a formal employment agreement in English.
-
-        The output MUST be a clean text summary of responsibilities, NOT markdown.
-        - The first line should be a clear title like "Scope of Duties".
-        - Use a bulleted list for the main duties, with each item starting with the "•" character.
-        - The tone must be formal and unambiguous.
-        - AVOID any markdown formatting like asterisks for bolding or lists (e.g., use "Scope of Duties", not "**Scope of Duties**").
-        - The description should be purely factual and centered on the tasks and responsibilities of the role.
-        - The final output must be ready to be copy-pasted directly into a legal document.
-
-        - Job Title: ${jobTitle}
-        - Company Name: ${companyName}
-        ${companyBusiness ? `- Company's business: ${companyBusiness}` : ''}
-
-        Generate the job description now.
+        **Information to Fill In:**
+        ${dataAsText}
       `;
+  }
 
-      const result = await model.generateContent(prompt);
+  async generateDescription(data: GenerateDescriptionDto): Promise<string> {
+    const { jobTitle, companyName, companyBusiness } = data;
+    const prompt = `
+      Act as a meticulous HR specialist drafting the "Scope of Duties" section for a formal employment agreement in English.
+
+      The output MUST be a clean text summary of responsibilities, NOT markdown.
+      - The first line should be a clear title like "Scope of Duties".
+      - Use a bulleted list for the main duties, with each item starting with the "•" character.
+      - The tone must be formal and unambiguous.
+      - AVOID any markdown formatting like asterisks for bolding or lists (e.g., use "Scope of Duties", not "**Scope of Duties**").
+      - The description should be purely factual and centered on the tasks and responsibilities of the role.
+      - The final output must be ready to be copy-pasted directly into a legal document.
+
+      - Job Title: ${jobTitle}
+      - Company Name: ${companyName}
+      ${companyBusiness ? `- Company's business: ${companyBusiness}` : ''}
+
+      Generate the job description now.
+    `;
+    
+    try {
+      const result = await this.geminiPro.generateContent(prompt);
       const response = result.response;
-      const text = response.text();
-      
-      return text;
-
+      return this.cleanLLMResponse(response.text());
     } catch (error) {
       console.error('Error generating description with AI:', error);
-      // In case of an AI error, return a fallback message or throw an exception
-      throw new Error('Failed to generate AI-powered description.');
+      throw new InternalServerErrorException('Failed to generate AI-powered description.');
     }
   }
 } 
