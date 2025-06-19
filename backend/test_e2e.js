@@ -1,7 +1,10 @@
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data');
 
 const API_URL = 'http://localhost:3001/api/v1/contracts/generate';
+const TEMPLATE_PATH = path.join(__dirname, '../Template-Employment-Contract-Agreement.pdf');
 
 const MODELS_TO_TEST = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
@@ -68,6 +71,46 @@ async function runTestForModel(modelName) {
   }
 }
 
+async function runTestWithTemplate(modelName) {
+  console.log(`--- Testing model with template: ${modelName} ---`);
+
+  if (!fs.existsSync(TEMPLATE_PATH)) {
+    console.error(`--- 🚨 TEST FAILED: Template file not found at ${TEMPLATE_PATH} 🚨 ---`);
+    return false;
+  }
+
+  const form = new FormData();
+  form.append('contractData', JSON.stringify(testPayload));
+  form.append('model', modelName);
+  form.append('templateFile', fs.createReadStream(TEMPLATE_PATH));
+
+  try {
+    const response = await axios.post(API_URL, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+    
+    const generatedContract = response.data.contract;
+
+    if (!generatedContract || generatedContract.length < 100) {
+      throw new Error(`Contract generation with template for ${modelName} produced a very short or empty response.`);
+    }
+
+    const fileName = `_resultat_${modelName}_avec_template.md`;
+    fs.writeFileSync(fileName, generatedContract);
+    
+    console.log(`✅ SUCCESS: Contract for ${modelName} with template generated and saved to ${fileName}`);
+    return true;
+
+  } catch (error) {
+    console.error(`--- 🚨 TEST FAILED for ${modelName} with template 🚨 ---`);
+    const errorMessage = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    console.error(errorMessage);
+    return false;
+  }
+}
+
 async function runAllTests() {
     console.log('--- A/B Model Test Started ---');
     let allTestsPassed = true;
@@ -79,9 +122,16 @@ async function runAllTests() {
         }
         console.log('\\n' + '-'.repeat(40) + '\\n');
     }
+    
+    // Test with template using the 'pro' model
+    const templateTestResult = await runTestWithTemplate('gemini-2.5-pro');
+    if (!templateTestResult) {
+        allTestsPassed = false;
+    }
+    console.log('\\n' + '-'.repeat(40) + '\\n');
 
     if (allTestsPassed) {
-        console.log('🎉 All models tested successfully. Please review the generated .md files.');
+        console.log('🎉 All models and templates tested successfully. Please review the generated .md files.');
     } else {
         console.error('🔥 Some model tests failed.');
         process.exit(1);
