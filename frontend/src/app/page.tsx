@@ -447,7 +447,7 @@ export default function Home() {
                     name="employerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name of employer</FormLabel>
+                        <FormLabel>Employer Name</FormLabel>
                         <FormControl>
                           <Input placeholder="Ex: Acme Inc." {...field} />
                         </FormControl>
@@ -460,7 +460,7 @@ export default function Home() {
                     name="employeeName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name of employee</FormLabel>
+                        <FormLabel>Employee Name</FormLabel>
                         <FormControl>
                           <Input placeholder="Ex: John Doe" {...field} />
                         </FormControl>
