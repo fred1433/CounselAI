@@ -2,14 +2,14 @@
 FROM node:20-slim AS deps
 WORKDIR /usr/src/app
 
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 # Stage 2: Development server
 FROM node:20-slim AS dev
 WORKDIR /usr/src/app
 COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY frontend/ .
+COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
@@ -18,7 +18,7 @@ FROM node:20-slim AS builder
 WORKDIR /usr/src/app
 
 COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY frontend/ .
+COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED 1
 

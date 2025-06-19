@@ -132,14 +132,13 @@ export class ContractsService {
   }
 
   async editContract(
-    currentContract: string,
-    instruction: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
     requestId: string,
   ): Promise<{ contract: string }> {
     this.logger.log(
-      `[SERVICE] Editing contract for ID ${requestId} with instruction: ${instruction}`,
+      `[SERVICE] Editing contract for ID ${requestId} based on history.`,
     );
-    const prompt = this.buildEditPrompt(currentContract, instruction);
+    const prompt = this.buildEditPrompt(history);
     try {
       this.logger.log(`[SERVICE] Calling Gemini for ID: ${requestId}`);
       const result = await this.geminiPro.generateContent(prompt);
@@ -156,26 +155,31 @@ export class ContractsService {
   }
 
   private buildEditPrompt(
-    currentContract: string,
-    instruction: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
   ): string {
+    const formattedHistory = history.map(item => 
+      `**${item.role === 'user' ? 'Client' : 'Lawyer (You)'}:**\n${item.content}`
+    ).join('\n\n---\n\n');
+
     return `
-      Act as an expert US-based lawyer editing a document.
-      You will be given an existing employment agreement and an instruction for a change.
-      Apply the change directly to the contract and return ONLY the full, updated Markdown text of the contract.
-      Do not add any commentary, preamble, or explanation. Return only the edited contract.
+      Act as an expert US-based lawyer. You are in an ongoing conversation with a client to draft an employment agreement.
+      The following is the complete history of your conversation. The client's last message is a new instruction.
+      
+      Your task is to read the entire conversation history to understand the context, apply the latest instruction from the client to the most recent version of the contract, and then return ONLY the full, updated, and clean Markdown text of the new contract.
 
-      **Instruction:**
-      "${instruction}"
+      **CRITICAL RULES:**
+      1.  **Analyze the ENTIRE history** to understand the evolution of the contract.
+      2.  The "assistant" or "Lawyer (You)" messages contain the full contract text at that point in the conversation. Use the LAST assistant message as the base for the new edit.
+      3.  The LAST message in the history is from the "user" (the client) and contains the instruction you must apply now.
+      4.  Your response MUST be only the complete and updated contract text in Markdown format. Do not include any commentary, greetings, or other conversational text.
 
       ---
-
-      **Current Contract Text:**
+      **Conversation History:**
       ---
-      ${currentContract}
+      ${formattedHistory}
       ---
 
-      Apply the instruction to the contract now.
+      Now, based on the client's last instruction, provide the full and updated contract text.
     `;
   }
 

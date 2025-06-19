@@ -226,7 +226,7 @@ export default function Home() {
   const [isGeneratingContract, setIsGeneratingContract] = useState<boolean>(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
@@ -262,8 +262,8 @@ export default function Home() {
     },
   });
 
+  // This effect establishes the socket connection.
   useEffect(() => {
-    // This effect establishes the socket connection.
     const newSocket = io('http://localhost:3001');
     setSocket(newSocket);
     console.log('Socket instance created.');
@@ -278,13 +278,17 @@ export default function Home() {
 
   useEffect(() => {
     // This effect is responsible for handling socket event listeners.
-    // It runs whenever the `socket` instance is created or changes.
-    if (!socket) {
-      return;
-    }
+    // It runs whenever the `socket` state changes.
+    if (!socket) return;
 
     const onConnect = () => {
       console.log('Socket connected!');
+      // clear any previous chat history on new connection
+      setChatHistory([]);
+    };
+
+    const onDisconnect = () => {
+      console.log('Socket disconnected!');
     };
 
     const onContractUpdate = (data: {
@@ -296,23 +300,23 @@ export default function Home() {
         data,
       );
       setGeneratedContract(data.contract);
+      // Add only the assistant's final response to the history
+      setChatHistory(prev => [...prev, { role: 'assistant', content: data.contract }]);
       setIsEditing(false);
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'The contract has been updated based on your request.',
-        },
-      ]);
     };
 
     const onGenerationComplete = (data: { contract: string }) => {
       setGeneratedContract(data.contract);
       setIsGeneratingContract(false);
+      // Initialize chat history after generation
+      setChatHistory([
+        { role: 'assistant', content: data.contract }
+      ]);
     };
 
     const onEditError = (data: { error: string; requestId?: string }) => {
-      console.error(`Edit error for request ID ${data.requestId}:`, data.error);
+      console.error(`[FRONTEND] Received edit_error for ID ${data.requestId}:`, data.error);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${data.error}` }]);
       setIsEditing(false);
     };
 
@@ -320,32 +324,39 @@ export default function Home() {
       console.log(`[SERVER LOG] ${data.type || 'info'}: ${data.message}`);
     };
 
-    console.log('Attaching socket listeners.');
+    // Register event listeners
     socket.on('connect', onConnect);
-    socket.on('contract_update', onContractUpdate);
+    socket.on('disconnect', onDisconnect);
     socket.on('generation_complete', onGenerationComplete);
+    socket.on('contract_update', onContractUpdate);
     socket.on('edit_error', onEditError);
     socket.on('log', onLog);
+    console.log('Attaching socket listeners.');
 
-    // Cleanup function to remove listeners when the component unmounts
-    // or before the effect re-runs for a new socket instance.
+    // Cleanup function to remove event listeners when the component
+    // re-renders or unmounts. Prevents duplicate event registrations.
     return () => {
       console.log('Detaching socket listeners.');
       socket.off('connect', onConnect);
-      socket.off('contract_update', onContractUpdate);
+      socket.off('disconnect', onDisconnect);
       socket.off('generation_complete', onGenerationComplete);
+      socket.off('contract_update', onContractUpdate);
       socket.off('edit_error', onEditError);
       socket.off('log', onLog);
     };
-  }, [socket]); // This effect re-runs if the socket object changes.
+  }, [socket]); // This effect re-runs only when the socket instance changes.
 
   async function onSubmit(data: ContractFormData) {
     setIsGeneratingContract(true);
-    setGeneratedContract('');
+    setGeneratedContract(''); // Clear previous contract
+    setChatHistory([]); // Clear previous history
+
+    // The initial prompt is not shown in the chat, but it's the first turn for the history.
+    const initialPrompt = `Generate a contract with these details: ${JSON.stringify(data)}`;
+    setChatHistory([{ role: 'user', content: initialPrompt }]);
 
     const formData = new FormData();
     formData.append('contractData', JSON.stringify(data));
-    
     if (templateFile) {
       formData.append('templateFile', templateFile);
     }
@@ -361,6 +372,11 @@ export default function Home() {
         }
       );
       setGeneratedContract(response.data.contract);
+      // Manually set the history after generation
+      setChatHistory([
+        { role: 'user', content: initialPrompt },
+        { role: 'assistant', content: response.data.contract },
+      ]);
     } catch (error) {
       console.error('Error generating contract:', error);
       // TODO: show a toast or other error message to the user
@@ -368,18 +384,6 @@ export default function Home() {
       setIsGeneratingContract(false);
     }
   }
-
-  // Effect to set the initial chat message when the contract is first generated
-  useEffect(() => {
-    if (generatedContract && chatHistory.length === 0) {
-      setChatHistory([{
-        role: 'assistant',
-        content: "I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: 'Change the salary to $98,000' or 'Add a clause for a company car.'"
-      }]);
-    }
-    // This effect depends on generatedContract, but not on chatHistory to avoid loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedContract]);
 
   const handleSendMessage = () => {
     if (!chatInput.trim() || !socket) return;
@@ -389,8 +393,7 @@ export default function Home() {
 
     setIsEditing(true);
     const payload = {
-      message: chatInput,
-      contract: generatedContract,
+      history: [...chatHistory, { role: 'user', content: chatInput }],
       requestId: requestId,
     };
     socket.emit('editContract', payload);
@@ -874,20 +877,53 @@ export default function Home() {
               Request changes in plain English.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1">
-            <div className="h-full border rounded-md p-4 bg-gray-50 space-y-4 overflow-y-auto">
-              {chatHistory.map((chat, index) => (
-                <div key={index} className={`flex flex-col ${chat.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`rounded-lg px-3 py-2 max-w-[80%] ${
-                      chat.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}>
-                    <span className="text-sm">{chat.content}</span>
+          <CardContent className="flex-1 overflow-y-auto">
+            <div className="h-full border rounded-md p-4 bg-gray-50 space-y-4">
+              {chatHistory.map((msg, index) => {
+                // The very first user message is the prompt for generation, so we don't display it.
+                if (index === 0 && msg.role === 'user') {
+                  return null;
+                }
+                // The first assistant message is the full contract, so we show a canned response.
+                if (index === 1 && msg.role === 'assistant') {
+                   return (
+                    <div key={index} className="flex justify-start">
+                       <div className="max-w-md p-3 rounded-lg bg-gray-200 text-gray-900">
+                          I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: &apos;Change the salary to $98,000&apos; or &apos;Add a clause for a company car.&apos;
+                       </div>
+                    </div>
+                  );
+                }
+                // Subsequent user messages are displayed as is.
+                if (msg.role === 'user') {
+                  return (
+                    <div key={index} className="flex justify-end">
+                      <div className="max-w-md p-3 rounded-lg bg-blue-500 text-white">
+                        {msg.content}
+                      </div>
+                    </div>
+                  );
+                }
+                // Subsequent assistant messages are confirmation of updates.
+                 if (index > 1 && msg.role === 'assistant') {
+                  return (
+                    <div key={index} className="flex justify-start">
+                       <div className="max-w-md p-3 rounded-lg bg-gray-200 text-gray-900">
+                          The contract has been updated based on your request.
+                       </div>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+              {isEditing && (
+                <div className="flex justify-start">
+                  <div className="p-3">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
                   </div>
                 </div>
-              ))}
-        </div>
+              )}
+            </div>
           </CardContent>
           <CardFooter>
             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2 w-full">

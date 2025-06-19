@@ -1,10 +1,10 @@
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     env_file:
-      - backend/.env
+      - ./backend/.env
     container_name: counselai-backend
     ports:
       - "3001:3001"
@@ -28,8 +28,8 @@ services:
 
   frontend-dev:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
       target: dev # Use the 'dev' stage for development
     container_name: counselai-frontend-dev
     ports:

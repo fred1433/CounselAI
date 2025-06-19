@@ -3,11 +3,11 @@ FROM node:20 AS builder
 
 WORKDIR /usr/src/app
 
-COPY backend/package*.json ./
+COPY package*.json ./
 
 RUN npm ci
 
-COPY backend/ .
+COPY . .
 
 RUN npm run build
 

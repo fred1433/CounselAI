@@ -7,9 +7,13 @@ import {
 import { Server } from 'socket.io';
 import { ContractsService } from './contracts.service';
 
-interface EditPayload {
-  contract: string;
-  message: string;
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface HistoryPayload {
+  history: ChatMessage[];
   requestId: string;
 }
 
@@ -25,12 +29,11 @@ export class ContractsGateway {
   constructor(private readonly contractsService: ContractsService) {}
 
   @SubscribeMessage('editContract')
-  async handleMessage(@MessageBody() data: EditPayload): Promise<void> {
+  async handleMessage(@MessageBody() data: HistoryPayload): Promise<void> {
     console.log(`[GATEWAY] Received editContract event with ID: ${data.requestId}`);
     try {
       const { contract: newContract } = await this.contractsService.editContract(
-        data.contract,
-        data.message,
+        data.history,
         data.requestId,
       );
 
