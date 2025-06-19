@@ -222,7 +222,10 @@ export class ContractsService {
       additionalClauses.push('- The contract MUST include a standard Non-Competition clause.');
     }
     if (data.attyInNotice) {
-      additionalClauses.push('- In the "Notices" section, specify that a copy of any notice should also be sent to the company\'s attorney. Use a placeholder for the attorney\'s name and address.');
+      const attorneyInstruction = data.attorneyName
+        ? `- In the "Notices" section, specify that a copy of any notice should also be sent to the company's attorney, ${data.attorneyName}. Use a placeholder for the attorney's address.`
+        : `- In the "Notices" section, specify that a copy of any notice should also be sent to the company's attorney. Use a placeholder for the attorney's name and address.`;
+      additionalClauses.push(attorneyInstruction);
     }
     if (data.prose) {
       additionalClauses.push(`- Also incorporate the following instructions from the user: "${data.prose}"`);

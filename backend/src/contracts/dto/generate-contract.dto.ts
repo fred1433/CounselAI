@@ -92,5 +92,9 @@ export class GenerateContractDto {
 
   @IsString()
   @IsOptional()
+  attorneyName?: string;
+
+  @IsString()
+  @IsOptional()
   prose?: string;
 } 

@@ -35,6 +35,14 @@ const payloadWithoutNda = {
   attyInNotice: false,
 };
 
+const payloadWithAttorney = {
+  ...basePayload,
+  includeNda: false,
+  includeNonCompetition: false,
+  attyInNotice: true,
+  attorneyName: 'Claire Kent, Esq.',
+};
+
 async function runTest(payload, testName) {
   console.log(`--- Running test: ${testName} ---`);
   
@@ -69,16 +77,18 @@ async function runTest(payload, testName) {
 }
 
 async function runAllTests() {
-    console.log('--- Full End-to-End NDA Clause Test Started ---');
+    console.log('--- Full End-to-End Test Suite Started ---');
     
     const resultWithNda = await runTest(payloadWithNda, 'Avec_NDA');
     console.log('\\n' + '-'.repeat(40) + '\\n');
     const resultWithoutNda = await runTest(payloadWithoutNda, 'Sans_NDA');
+    console.log('\\n' + '-'.repeat(40) + '\\n');
+    const resultWithAttorney = await runTest(payloadWithAttorney, 'Avec_Avocat');
     
     console.log('\\n' + '-'.repeat(40) + '\\n');
 
-    if (resultWithNda && resultWithoutNda) {
-        console.log('🎉 Both tests completed successfully. Please review the generated files to confirm the output.');
+    if (resultWithNda && resultWithoutNda && resultWithAttorney) {
+        console.log('🎉 All tests completed successfully. Please review the generated files to confirm the output.');
     } else {
         console.error('🔥 One or more tests failed.');
         process.exit(1);
