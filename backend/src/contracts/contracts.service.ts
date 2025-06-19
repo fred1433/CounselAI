@@ -230,53 +230,62 @@ export class ContractsService {
         if (key === 'benefits' && typeof value === 'object' && value !== null) {
           const benefits = Object.entries(value)
             .filter(([, v]) => v)
-            .map(([k]) => k.replace(/([A-Z])/g, ' $1').trim())
-            .join(', ');
-          return `Benefits: ${benefits}`;
+            .map(([k]) => `- ${k.replace(/([A-Z])/g, ' $1').trim()}`)
+            .join('\\n');
+          return `**Benefits:**\\n${benefits}`;
         }
-        if (typeof value !== 'object') {
-            return `${key}: ${value}`;
+        if (typeof value !== 'object' && value !== null && value !== '') {
+            const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, (c) => c.toUpperCase());
+            return `**${formattedKey}:** ${value}`;
         }
         return '';
       })
       .filter(line => line)
-      .join('\n');
+      .join('\\n');
 
     return `
-        You are an expert legal assistant. Your task is to complete a contract template with the provided information.
-        Fill in the placeholders within the template (like [EMPLOYER_NAME], [JOB_TITLE], [SALARY], etc.) with the corresponding details from the 'Information to Fill In' section.
-        If the template is more generic, use the provided data to complete it as logically as possible.
-        Do not invent new clauses or significantly modify the structure of the template.
-        Output ONLY the completed contract text in Markdown format.
+        Act as an expert US-based lawyer. Your task is to generate a final employment agreement.
 
-        **Contract Template to Complete:**
+        You will be given a raw text template extracted from a document and a list of specific details. Your job is to intelligently integrate the details into the template's structure to create a clean, final contract.
+        
+        **CRITICAL INSTRUCTIONS:**
+        1.  **CLEAN THE TEMPLATE:** The provided template text may contain artifacts from its original format, such as "Page 1", "Employee's Initials: ____", headers, or footers. You MUST identify and completely remove these artifacts from the final output. The final document should look like a clean contract, not a scanned page.
+        2.  **INTEGRATE DATA:** Fill in the placeholders or relevant sections of the template (e.g., [EMPLOYER_NAME], [JOB_TITLE], [SALARY]) with the corresponding details from the 'Data to Integrate' section.
+        3.  **FINAL FORMATTING:** The final output MUST be a single, coherent document formatted in clean, well-structured Markdown. Use headings (#, ##), bolding (**), and lists (-) appropriately to ensure high readability. Do not wrap the output in a code block.
+
+        ---
+        **Data to Integrate:**
+        ---
+        ${dataAsText}
+        ---
+
+        ---
+        **Raw Text Template (to be cleaned and completed):**
         ---
         ${template}
         ---
 
-        **Information to Fill In:**
-        ${dataAsText}
-      `;
+        Now, generate the final, clean, and well-formatted Markdown contract based on all the instructions above.
+    `;
   }
 
   async generateDescription(data: GenerateDescriptionDto): Promise<string> {
     const { jobTitle, companyName, companyBusiness } = data;
     const prompt = `
-      Act as a meticulous HR specialist drafting the "Scope of Duties" section for a formal employment agreement in English.
+        Act as a meticulous HR specialist drafting the "Scope of Duties" section for a formal employment agreement in English.
+        Your response must be a single block of text suitable for direct insertion into a larger document.
+        - The first line should be a clear title like "Scope of Duties".
+        - Use a bulleted list for the main duties, with each item starting with the "•" character.
+        - The tone must be formal and unambiguous.
+        - AVOID any markdown formatting like asterisks for bolding or lists (e.g., use "Scope of Duties", not "**Scope of Duties**").
+        - The description should be purely factual and centered on the tasks and responsibilities of the role.
+        - The final output must be ready to be copy-pasted directly into a legal document.
 
-      The output MUST be a clean text summary of responsibilities, NOT markdown.
-      - The first line should be a clear title like "Scope of Duties".
-      - Use a bulleted list for the main duties, with each item starting with the "•" character.
-      - The tone must be formal and unambiguous.
-      - AVOID any markdown formatting like asterisks for bolding or lists (e.g., use "Scope of Duties", not "**Scope of Duties**").
-      - The description should be purely factual and centered on the tasks and responsibilities of the role.
-      - The final output must be ready to be copy-pasted directly into a legal document.
+        - Job Title: ${jobTitle}
+        - Company Name: ${companyName}
+        ${companyBusiness ? `- Company's business: ${companyBusiness}` : ''}
 
-      - Job Title: ${jobTitle}
-      - Company Name: ${companyName}
-      ${companyBusiness ? `- Company's business: ${companyBusiness}` : ''}
-
-      Generate the job description now.
+        Generate the job description now.
     `;
     
     try {
