@@ -51,3 +51,6 @@ Thumbs.db
 # Root src folder, if accidentally created
 /src 
 template.txt
+
+# Test results
+_resultat_*.md
