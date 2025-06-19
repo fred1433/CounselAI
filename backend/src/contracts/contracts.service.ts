@@ -213,6 +213,20 @@ export class ContractsService {
       .filter(([, value]) => value)
       .map(([key]) => `- ${key.replace(/([A-Z])/g, ' $1').trim()}`)
       .join('\n');
+
+    const additionalClauses = [];
+    if (data.includeNda) {
+      additionalClauses.push('- The contract MUST include a comprehensive Non-Disclosure Agreement (NDA) clause.');
+    }
+    if (data.includeNonCompetition) {
+      additionalClauses.push('- The contract MUST include a standard Non-Competition clause.');
+    }
+    if (data.attyInNotice) {
+      additionalClauses.push('- In the "Notices" section, specify that a copy of any notice should also be sent to the company\'s attorney. Use a placeholder for the attorney\'s name and address.');
+    }
+    if (data.prose) {
+      additionalClauses.push(`- Also incorporate the following instructions from the user: "${data.prose}"`);
+    }
     
     return `
       As an expert lawyer, generate a professional, legally-sound employment contract based on the following details.
@@ -247,13 +261,7 @@ export class ContractsService {
       ${benefitsList}
       ${data.otherBenefits ? `- Other: ${data.otherBenefits}`: ''}
 
-      **Additional Clauses:**
-      - Include NDA: ${data.includeNda ? 'Yes' : 'No'}
-      - Include Non-Competition Clause: ${data.includeNonCompetition ? 'Yes' : 'No'}
-      - Attorney to be named in the Notice provision: ${data.attyInNotice ? 'Yes' : 'No'}
-      
-      **Other Specifics (Prose):**
-      "${data.prose}"
+      ${additionalClauses.length > 0 ? `**Additional Clauses & Instructions:**\n${additionalClauses.map(c => `      ${c}`).join('\n')}` : ''}
 
       ---
       Generate the full text of the employment agreement based on this information.

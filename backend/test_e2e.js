@@ -1,110 +1,67 @@
 const axios = require('axios');
 const fs = require('fs');
-const path = require('path');
-const FormData = require('form-data');
 
 const API_URL = 'http://localhost:3001/api/v1/contracts/generate';
-const TEMPLATE_PATH = path.join(__dirname, '../Template-Employment-Contract-Agreement.pdf');
+const MODEL_TO_USE = 'gemini-2.5-pro';
 
-const MODELS_TO_TEST = ['gemini-2.5-flash', 'gemini-2.5-pro'];
-
-// A more complex payload to better test the models' capabilities
-const testPayload = {
-  employerName: 'QuantumLeap AI',
+const basePayload = {
+  employerName: 'Innovatech Solutions',
   employeeName: 'Dr. Evelyn Reed',
   jobTitle: 'Principal Research Scientist, AI Ethics',
-  jobDescription: 'Lead foundational research on the long-term societal impacts of artificial general intelligence. Develop and champion new frameworks for transparent, equitable, and safe AI. This role requires a PhD in a relevant field and extensive publications.',
+  jobDescription: 'Lead foundational research on the long-term societal impacts of AGI.',
   startDate: '2025-08-01',
-  hasInitialTerm: true,
-  hasNoEndDate: false, // Explicitly false for a term-based contract
-  onSitePresence: 'Hybrid, with a minimum of 3 days per week at our San Francisco headquarters.',
+  hasInitialTerm: false,
+  hasNoEndDate: true,
   salary: '$280,000 USD per annum',
-  benefits: {
-    health: true,
-    dental: true,
-    vacationSick: true,
-    parking: true,
-    profitSharing: true,
-    fourZeroOneK: true,
-    paidBarMembership: false,
-    clePaid: false,
-    cellPhone: true,
+  benefits: { 
+    health: true, dental: true, vacationSick: true, parking: true,
+    profitSharing: true, fourZeroOneK: true, paidBarMembership: false,
+    clePaid: false, cellPhone: true,
   },
-  otherBenefits: 'An annual research and conference budget of $15,000. Executive-level life insurance policy. Sabbatical options available after 5 years of service.',
-  includeNda: true,
-  includeNonCompetition: true,
-  attyInNotice: true,
-  prose: 'The non-competition clause should be for a duration of 18 months and cover the entire United States. The agreement should be governed by the laws of the State of Delaware. Include a clause for a relocation bonus of $25,000, payable upon starting.',
+  prose: 'Governing law is Delaware.',
 };
 
+const payloadWithNda = {
+  ...basePayload,
+  includeNda: true,
+  includeNonCompetition: false,
+  attyInNotice: false,
+};
 
-async function runTestForModel(modelName) {
-  console.log(`--- Testing model: ${modelName} ---`);
+const payloadWithoutNda = {
+  ...basePayload,
+  includeNda: false,
+  includeNonCompetition: false,
+  attyInNotice: false,
+};
+
+async function runTest(payload, testName) {
+  console.log(`--- Running test: ${testName} ---`);
   
-  const payload = {
-    contractData: JSON.stringify(testPayload),
-    model: modelName,
+  const apiPayload = {
+    contractData: JSON.stringify(payload),
+    model: MODEL_TO_USE,
   };
 
   try {
-    const response = await axios.post(API_URL, payload, {
+    const response = await axios.post(API_URL, apiPayload, {
       headers: { 'Content-Type': 'application/json' },
     });
     
     const generatedContract = response.data.contract;
 
     if (!generatedContract || generatedContract.length < 100) {
-      throw new Error(`Contract generation for ${modelName} produced a very short or empty response.`);
+      throw new Error(`Contract generation for ${testName} produced a very short or empty response.`);
     }
 
-    const fileName = `_resultat_${modelName}.md`;
+    const fileName = `_resultat_${testName}.md`;
     fs.writeFileSync(fileName, generatedContract);
     
-    console.log(`✅ SUCCESS: Contract for ${modelName} generated and saved to ${fileName}`);
+    console.log(`✅ SUCCESS: Contract for ${testName} generated and saved to ${fileName}`);
     return true;
 
   } catch (error) {
-    console.error(`--- 🚨 TEST FAILED for ${modelName} 🚨 ---`);
-    const errorMessage = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
-    console.error(errorMessage);
-    return false;
-  }
-}
-
-async function runTestWithTemplate(modelName) {
-  console.log(`--- Testing model with template: ${modelName} ---`);
-
-  if (!fs.existsSync(TEMPLATE_PATH)) {
-    console.error(`--- 🚨 TEST FAILED: Template file not found at ${TEMPLATE_PATH} 🚨 ---`);
-    return false;
-  }
-
-  const form = new FormData();
-  form.append('contractData', JSON.stringify(testPayload));
-  form.append('model', modelName);
-  form.append('templateFile', fs.createReadStream(TEMPLATE_PATH));
-
-  try {
-    const response = await axios.post(API_URL, form, {
-      headers: {
-        ...form.getHeaders(),
-      },
-    });
-    
-    const generatedContract = response.data.contract;
-
-    if (!generatedContract || generatedContract.length < 100) {
-      throw new Error(`Contract generation with template for ${modelName} produced a very short or empty response.`);
-    }
-
-    const fileName = `_resultat_${modelName}_avec_template.md`;
-    fs.writeFileSync(fileName, generatedContract);
-    
-    console.log(`✅ SUCCESS: Contract for ${modelName} with template generated and saved to ${fileName}`);
-    return true;
-
-  } catch (error) {
-    console.error(`--- 🚨 TEST FAILED for ${modelName} with template 🚨 ---`);
+    console.error(`--- 🚨 TEST FAILED for ${testName} 🚨 ---`);
     const errorMessage = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
     console.error(errorMessage);
     return false;
@@ -112,33 +69,22 @@ async function runTestWithTemplate(modelName) {
 }
 
 async function runAllTests() {
-    console.log('--- A/B Model Test Started ---');
-    let allTestsPassed = true;
-
-    for (const model of MODELS_TO_TEST) {
-        const result = await runTestForModel(model);
-        if (!result) {
-            allTestsPassed = false;
-        }
-        console.log('\\n' + '-'.repeat(40) + '\\n');
-    }
+    console.log('--- Full End-to-End NDA Clause Test Started ---');
     
-    // Test with template using the 'pro' model
-    const templateTestResult = await runTestWithTemplate('gemini-2.5-pro');
-    if (!templateTestResult) {
-        allTestsPassed = false;
-    }
+    const resultWithNda = await runTest(payloadWithNda, 'Avec_NDA');
+    console.log('\\n' + '-'.repeat(40) + '\\n');
+    const resultWithoutNda = await runTest(payloadWithoutNda, 'Sans_NDA');
+    
     console.log('\\n' + '-'.repeat(40) + '\\n');
 
-    if (allTestsPassed) {
-        console.log('🎉 All models and templates tested successfully. Please review the generated .md files.');
+    if (resultWithNda && resultWithoutNda) {
+        console.log('🎉 Both tests completed successfully. Please review the generated files to confirm the output.');
     } else {
-        console.error('🔥 Some model tests failed.');
+        console.error('🔥 One or more tests failed.');
         process.exit(1);
     }
-    console.log('--- A/B Model Test Finished ---');
+    console.log('--- Test Finished ---');
 }
-
 
 // Give the server a moment to start up
 setTimeout(runAllTests, 2000); 

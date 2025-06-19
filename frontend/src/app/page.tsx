@@ -259,9 +259,12 @@ export default function Home() {
       includeNda: false,
       includeNonCompetition: false,
       attyInNotice: false,
+      attorneyName: '',
       prose: "",
     },
   });
+
+  const attyInNotice = form.watch('attyInNotice');
 
   // This effect establishes the socket connection.
   useEffect(() => {
@@ -802,6 +805,21 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
+                {attyInNotice && (
+                  <FormField
+                    control={form.control}
+                    name="attorneyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Attorney's Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., John Doe, Esq." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
         </div>
 
               {/* Section: Other Specifics */}
