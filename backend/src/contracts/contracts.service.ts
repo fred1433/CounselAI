@@ -17,19 +17,24 @@ import { plainToClass } from 'class-transformer';
 
 @Injectable()
 export class ContractsService {
-  private readonly geminiPro: GenerativeModel;
+  private readonly genAI: GoogleGenerativeAI;
   private readonly logger = new Logger(ContractsService.name);
 
   constructor(
     private readonly configService: ConfigService,
     @Inject('GEMINI_API_KEY') private readonly gemini_api_key: string,
   ) {
-    const modelName = this.configService.get<string>(
+    this.genAI = new GoogleGenerativeAI(this.gemini_api_key);
+  }
+
+  private getModel(modelName?: string): GenerativeModel {
+    const defaultModel = this.configService.get<string>(
       'GEMINI_MODEL_NAME',
       'gemini-1.5-flash',
     );
-    const genAI = new GoogleGenerativeAI(this.gemini_api_key);
-    this.geminiPro = genAI.getGenerativeModel({ model: modelName });
+    const finalModelName = modelName || defaultModel;
+    this.logger.log(`Using model: ${finalModelName}`);
+    return this.genAI.getGenerativeModel({ model: finalModelName });
   }
 
   private cleanLLMResponse(response: string): string {
@@ -76,6 +81,7 @@ export class ContractsService {
   async generateContract(
     contractData: string, // Accept string to manually parse and validate
     templateFile?: Express.Multer.File,
+    model?: string,
   ): Promise<string> {
     let contractDto: GenerateContractDto;
     try {
@@ -112,7 +118,8 @@ export class ContractsService {
 
     try {
       this.logger.log('Sending prompt to Gemini API...');
-      const result = await this.geminiPro.generateContent(prompt);
+      const geminiPro = this.getModel(model);
+      const result = await geminiPro.generateContent(prompt);
       const response = result.response;
       const text = response.text();
       const cleanedText = this.cleanLLMResponse(text);
@@ -141,7 +148,8 @@ export class ContractsService {
     const prompt = this.buildEditPrompt(history);
     try {
       this.logger.log(`[SERVICE] Calling Gemini for ID: ${requestId}`);
-      const result = await this.geminiPro.generateContent(prompt);
+      const geminiPro = this.getModel(); // Edit always uses the default model
+      const result = await geminiPro.generateContent(prompt);
       const response = await result.response;
       const cleanedText = this.cleanLLMResponse(response.text());
       this.logger.log(`[SERVICE] Gemini response received for ID: ${requestId}`);
@@ -293,7 +301,8 @@ export class ContractsService {
     `;
     
     try {
-      const result = await this.geminiPro.generateContent(prompt);
+      const geminiPro = this.getModel(); // Use the default model for descriptions
+      const result = await geminiPro.generateContent(prompt);
       const response = result.response;
       return this.cleanLLMResponse(response.text());
     } catch (error) {

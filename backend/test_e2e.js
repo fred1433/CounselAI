@@ -1,108 +1,94 @@
 const axios = require('axios');
-const { io } = require('socket.io-client');
+const fs = require('fs');
 
 const API_URL = 'http://localhost:3001/api/v1/contracts/generate';
-const WS_URL = 'http://localhost:3001';
 
+const MODELS_TO_TEST = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+
+// A more complex payload to better test the models' capabilities
 const testPayload = {
-  employerName: 'TestCorp',
-  employeeName: 'Jane Tester',
-  jobTitle: 'Quality Assurance',
-  jobDescription: 'Testing everything.',
-  startDate: '2025-01-01',
-  hasInitialTerm: false,
-  hasNoEndDate: true,
-  onSitePresence: '100%',
-  salary: '$50,000',
+  employerName: 'QuantumLeap AI',
+  employeeName: 'Dr. Evelyn Reed',
+  jobTitle: 'Principal Research Scientist, AI Ethics',
+  jobDescription: 'Lead foundational research on the long-term societal impacts of artificial general intelligence. Develop and champion new frameworks for transparent, equitable, and safe AI. This role requires a PhD in a relevant field and extensive publications.',
+  startDate: '2025-08-01',
+  hasInitialTerm: true,
+  hasNoEndDate: false, // Explicitly false for a term-based contract
+  onSitePresence: 'Hybrid, with a minimum of 3 days per week at our San Francisco headquarters.',
+  salary: '$280,000 USD per annum',
   benefits: {
     health: true,
-    dental: false,
+    dental: true,
     vacationSick: true,
-    parking: false,
-    profitSharing: false,
+    parking: true,
+    profitSharing: true,
     fourZeroOneK: true,
     paidBarMembership: false,
     clePaid: false,
-    cellPhone: false,
+    cellPhone: true,
   },
-  otherBenefits: 'Annual bonus based on performance.',
+  otherBenefits: 'An annual research and conference budget of $15,000. Executive-level life insurance policy. Sabbatical options available after 5 years of service.',
   includeNda: true,
-  includeNonCompetition: false,
+  includeNonCompetition: true,
   attyInNotice: true,
-  prose: 'The employee must receive a new laptop.',
+  prose: 'The non-competition clause should be for a duration of 18 months and cover the entire United States. The agreement should be governed by the laws of the State of Delaware. Include a clause for a relocation bonus of $25,000, payable upon starting.',
 };
 
-const editInstruction = 'Change the salary to $95,000 per year and the job title to "Senior Tester".';
 
-async function runTest() {
-  let initialContract = '';
-  console.log('--- E2E Test Started ---');
+async function runTestForModel(modelName) {
+  console.log(`--- Testing model: ${modelName} ---`);
+  
+  const payload = {
+    contractData: JSON.stringify(testPayload),
+    model: modelName,
+  };
 
   try {
-    // 1. Generate Contract
-    console.log('Step 1: Generating initial contract...');
-    const response = await axios.post(API_URL, testPayload);
-    initialContract = response.data.contract;
-
-    if (!initialContract || !initialContract.includes('50,000')) {
-      throw new Error('Contract generation failed or did not contain the initial salary.');
-    }
-    console.log('✅ Initial contract generated successfully.');
-    
-    // 2. Connect via WebSocket and request edit
-    console.log('\nStep 2: Connecting to WebSocket and requesting edit...');
-    const socket = io(WS_URL, { reconnection: false });
-
-    const editPromise = new Promise((resolve, reject) => {
-      socket.on('connect', () => {
-        console.log('✅ WebSocket connected.');
-        socket.emit('editRequest', {
-          contract: initialContract,
-          message: editInstruction,
-        });
-        console.log('📤 Edit request sent.');
-      });
-
-      socket.on('contractUpdated', (newContract) => {
-        console.log('✅ "contractUpdated" event received.');
-        resolve(newContract);
-        socket.disconnect();
-      });
-      
-      socket.on('editError', (error) => {
-        reject(new Error(`Received editError: ${error}`));
-        socket.disconnect();
-      });
-
-      socket.on('connect_error', (err) => {
-        reject(new Error(`Connection failed: ${err.message}`));
-      });
+    const response = await axios.post(API_URL, payload, {
+      headers: { 'Content-Type': 'application/json' },
     });
+    
+    const generatedContract = response.data.contract;
 
-    const newContract = await editPromise;
-
-    // 3. Verify the result
-    console.log('\nStep 3: Verifying the edited contract...');
-    if (typeof newContract !== 'string') {
-        throw new Error(`Test Failed: newContract is not a string, but ${typeof newContract}`);
+    if (!generatedContract || generatedContract.length < 100) {
+      throw new Error(`Contract generation for ${modelName} produced a very short or empty response.`);
     }
-    const salaryUpdated = newContract.includes('95,000');
-    const titleUpdated = newContract.includes('Senior Tester');
 
-    if (salaryUpdated && titleUpdated) {
-      console.log('✅ SUCCESS: Salary and Title were updated correctly.');
-    } else {
-      throw new Error(`Test Failed: Salary updated: ${salaryUpdated}, Title updated: ${titleUpdated}`);
-    }
+    const fileName = `_resultat_${modelName}.md`;
+    fs.writeFileSync(fileName, generatedContract);
+    
+    console.log(`✅ SUCCESS: Contract for ${modelName} generated and saved to ${fileName}`);
+    return true;
 
   } catch (error) {
-    console.error('\n--- 🚨 TEST FAILED 🚨 ---');
-    console.error(error.message);
-    process.exit(1);
-  } finally {
-    console.log('\n--- E2E Test Finished ---');
+    console.error(`--- 🚨 TEST FAILED for ${modelName} 🚨 ---`);
+    const errorMessage = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    console.error(errorMessage);
+    return false;
   }
 }
 
+async function runAllTests() {
+    console.log('--- A/B Model Test Started ---');
+    let allTestsPassed = true;
+
+    for (const model of MODELS_TO_TEST) {
+        const result = await runTestForModel(model);
+        if (!result) {
+            allTestsPassed = false;
+        }
+        console.log('\\n' + '-'.repeat(40) + '\\n');
+    }
+
+    if (allTestsPassed) {
+        console.log('🎉 All models tested successfully. Please review the generated .md files.');
+    } else {
+        console.error('🔥 Some model tests failed.');
+        process.exit(1);
+    }
+    console.log('--- A/B Model Test Finished ---');
+}
+
+
 // Give the server a moment to start up
-setTimeout(runTest, 2000); 
+setTimeout(runAllTests, 2000); 

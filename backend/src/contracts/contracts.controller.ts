@@ -27,6 +27,7 @@ export class ContractsController {
   @UseInterceptors(FileInterceptor('templateFile'))
   async generateContract(
     @Body('contractData') contractData: string,
+    @Body('model') model: string,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -41,6 +42,7 @@ export class ContractsController {
     const generatedText = await this.contractsService.generateContract(
       contractData,
       templateFile,
+      model,
     );
     this.contractsGateway.server.emit('generation_complete', { contract: generatedText });
     return { contract: generatedText };
