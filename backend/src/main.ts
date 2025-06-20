@@ -7,7 +7,12 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: 'http://localhost:3000', // Allow our frontend
+    origin: [
+      'http://localhost:3000',
+      'https://counselai-frontend.onrender.com'
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
   });
 
   // Global Validation Pipe
