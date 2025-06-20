@@ -26,24 +26,18 @@ services:
   #     - backend
   #   restart: unless-stopped
 
-  frontend-dev:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: dev # Use the 'dev' stage for development
-    container_name: counselai-frontend-dev
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     ports:
       - "3000:3000"
-    networks:
-      - counselai-net
+    env_file:
+      - ./.env
     depends_on:
       - backend
-    volumes:
-      # Mount the frontend source code for hot-reloading
-      - ./frontend:/usr/src/app
-      # Exclude node_modules from being overwritten by the mount
-      - /usr/src/app/node_modules
-    restart: unless-stopped
 
 networks:
   counselai-net:

@@ -93,12 +93,15 @@ export default function Home() {
 
   // This effect establishes the socket connection.
   useEffect(() => {
-    const newSocket = io('http://localhost:3001');
-    setSocket(newSocket);
-    console.log('Socket instance created.');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) return;
 
-    // Cleanup function to disconnect the socket when the component unmounts.
-    // This is crucial for React's StrictMode to prevent duplicate connections.
+    // The base URL for the socket is the API URL without the /api/v1 path
+    const socketUrl = apiUrl.replace('/api/v1', '');
+    const newSocket = io(socketUrl, { transports: ['websocket'] });
+    setSocket(newSocket);
+    console.log('Socket instance created for:', socketUrl);
+
     return () => {
       console.log('Cleaning up and disconnecting socket.');
       newSocket.disconnect();
@@ -191,8 +194,11 @@ export default function Home() {
     }
 
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) throw new Error('API URL is not configured');
+
       const response = await axios.post(
-        'http://localhost:3001/api/v1/contracts/generate',
+        `${apiUrl}/contracts/generate`,
         formData,
         {
           headers: {
@@ -304,7 +310,10 @@ export default function Home() {
     try {
       const { jobTitle, employerName } = form.getValues();
       
-      const response = await axios.post('/api/v1/contracts/generate-description', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) throw new Error('API URL is not configured');
+
+      const response = await axios.post(`${apiUrl}/contracts/generate-description`, {
         jobTitle,
         companyName: employerName,
       });

@@ -4,14 +4,6 @@ const nextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
-    async rewrites() {
-        return [
-            {
-                source: '/api/:path*',
-                destination: 'https://counselai-backend.onrender.com/api/:path*',
-            },
-        ];
-    },
 };
 
 export default nextConfig; 
