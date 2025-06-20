@@ -8,7 +8,7 @@ const nextConfig = {
         return [
             {
                 source: '/api/:path*',
-                destination: 'http://backend:3001/api/:path*',
+                destination: 'https://counselai-backend.onrender.com/api/:path*',
             },
         ];
     },
