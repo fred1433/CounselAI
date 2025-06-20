@@ -730,6 +730,11 @@ export default function Home() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
             <div className="h-full border rounded-md p-4 bg-gray-50 space-y-4">
+              <div className="flex justify-start">
+                 <div className="max-w-md p-3 rounded-lg bg-gray-200 text-gray-900">
+                    I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: &apos;Change the salary to $98,000&apos; or &apos;Add a clause for a company car.&apos;
+                 </div>
+              </div>
               {chatHistory.map((msg, index) => {
                 // The very first user message is the prompt for generation, so we don't display it.
                 if (index === 0 && msg.role === 'user') {
@@ -737,13 +742,7 @@ export default function Home() {
                 }
                 // The first assistant message is the full contract, so we show a canned response.
                 if (index === 1 && msg.role === 'assistant') {
-                   return (
-                    <div key={index} className="flex justify-start">
-                       <div className="max-w-md p-3 rounded-lg bg-gray-200 text-gray-900">
-                          I have generated a draft of the contract. Feel free to review it and ask me for changes. For example: &apos;Change the salary to $98,000&apos; or &apos;Add a clause for a company car.&apos;
-                       </div>
-                    </div>
-                  );
+                   return null;
                 }
                 // Subsequent user messages are displayed as is.
                 if (msg.role === 'user') {
