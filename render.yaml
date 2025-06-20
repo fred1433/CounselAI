@@ -4,7 +4,7 @@ services:
     name: counselai-backend
     env: node
     region: oregon # Ou une autre région de votre choix : oregon, ohio, singapore
-    plan: free # Spécifie le plan gratuit
+    plan: starter # Spécifie le plan gratuit
     rootDir: ./backend
     buildCommand: |
       npm install
@@ -27,7 +27,7 @@ services:
     name: counselai-frontend
     env: node
     region: oregon # Assurez-vous que c'est la même région que le backend
-    plan: free
+    plan: starter
     rootDir: ./frontend
     buildCommand: |
       npm install
